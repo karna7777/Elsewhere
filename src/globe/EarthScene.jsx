@@ -9,11 +9,13 @@ import DayNight from './DayNight'
 import AtmosphereShader from './AtmosphereShader'
 import Clouds from './Clouds'
 import Aurora from './Aurora'
+import CameraRig from './CameraRig'
 
 export default function EarthScene() {
   return (
     <>
-      {import.meta.env.DEV && <Leva collapsed />}
+      {/* Leva dev panel kept mounted (controls still drive the globe) but hidden from view */}
+      <Leva hidden />
       <Canvas
         style={{ width: '100%', height: '100%', background: '#000000' }}
         gl={{ antialias: true, alpha: false }}
@@ -21,6 +23,7 @@ export default function EarthScene() {
       >
         <color attach="background" args={['#000000']} />
         <PerspectiveCamera makeDefault position={[0, 0, 2.8]} fov={45} />
+        <CameraRig />
         <Stars />
         <DayNight>
           <Earth />

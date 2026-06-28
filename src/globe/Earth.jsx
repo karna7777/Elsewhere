@@ -2,6 +2,7 @@ import { Component, Suspense, useEffect, useRef } from 'react'
 import { useFrame, useThree, useLoader } from '@react-three/fiber'
 import { useControls } from 'leva'
 import { TextureLoader, SRGBColorSpace, MathUtils } from 'three'
+import useStore from '../store/useStore'
 
 const FALLBACK_COLOR = '#2266aa'
 const DECAY = 0.92
@@ -84,6 +85,13 @@ export default function Earth() {
   const velocity = useRef({ x: 0, y: MIN_VEL })
   const targetZoom = useRef(2.8)
   const pinchRef = useRef(null)
+  // Tracks the previous frame's flying state to detect the ownership handoff
+  // moment (GSAP → Earth) so we can adopt the landed camera position exactly once.
+  const wasFlying = useRef(false)
+  // When a fly-to lands, we hold the globe still so the destination stays
+  // locked on the +Z axis (centered in view). The hold is released the moment
+  // the user interacts (drags), at which point normal idle rotation resumes.
+  const rotationHold = useRef(false)
 
   const { rotationSpeed, minZoom, maxZoom } = useControls(
     'Earth',
@@ -98,6 +106,8 @@ export default function Earth() {
   const handlers = {
     onPointerDown: (e) => {
       e.stopPropagation()
+      // User is taking control — release any post-flight rotation lock.
+      rotationHold.current = false
       dragging.current = true
       lastPointer.current = { x: e.clientX, y: e.clientY }
       e.target.setPointerCapture(e.pointerId)
@@ -160,16 +170,29 @@ export default function Earth() {
       pinchRef.current = null
     }
 
+    // Zero auto-rotation velocity when a fly-to completes so the globe
+    // does not spin away from the destination the moment Earth takes back control.
+    // The minimum idle spin (MIN_VEL) will resume naturally on the next frame.
+    const onFlyComplete = () => {
+      velocity.current.x = 0
+      velocity.current.y = 0
+      // Hold the globe still so the just-aligned destination stays centered
+      // on +Z. Released on the next user drag (see onPointerDown).
+      rotationHold.current = true
+    }
+
     el.addEventListener('wheel', onWheel, { passive: false })
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchmove', onTouchMove, { passive: true })
     el.addEventListener('touchend', onTouchEnd)
+    window.addEventListener('fly-complete', onFlyComplete)
 
     return () => {
       el.removeEventListener('wheel', onWheel)
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
+      window.removeEventListener('fly-complete', onFlyComplete)
     }
   }, [gl, minZoom, maxZoom])
 
@@ -177,7 +200,30 @@ export default function Earth() {
     const mesh = meshRef.current
     if (!mesh) return
 
-    if (!dragging.current) {
+    // Read flying state directly from store (no React subscription needed in frame loop)
+    const flying = useStore.getState().isFlying
+
+    // ── Ownership handoff ────────────────────────────────────────────────────
+    // On the exact frame that GSAP releases camera control (flying flips false),
+    // adopt the camera's current position as the new zoom target. Without this,
+    // targetZoom.current would still hold its old value (e.g. 2.8) and the lerp
+    // below would immediately drag the camera away from the destination.
+    if (wasFlying.current && !flying) {
+      targetZoom.current = camera.position.z
+    }
+    wasFlying.current = flying
+
+    // ── GSAP owns the camera during flight ───────────────────────────────────
+    // Yield completely: no rotation increments (which would desync the
+    // quaternion slerp in useFlyTo) and no zoom lerp (which would pull
+    // camera.position.z back toward the old targetZoom).
+    if (flying) return
+
+    // While the post-flight hold is active, skip ALL idle rotation (including
+    // the minimum-spin floor) so the destination remains locked dead-center.
+    // Without this, MIN_VEL would re-spin the globe one frame after landing and
+    // drag the destination off-axis — the root cause of the "drift" after a fly-to.
+    if (!dragging.current && !rotationHold.current) {
       velocity.current.x *= DECAY
       velocity.current.y *= DECAY
       const minSpin = MIN_VEL * rotationSpeed
