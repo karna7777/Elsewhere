@@ -1,4 +1,4 @@
-// Placeholder — Ellie (Groq) is implemented in Prompt 10.
+// Placeholder — the conversational Ellie (Groq) lives in EllieModule.
 export default function AITab() {
   return (
     <div

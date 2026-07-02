@@ -1,191 +1,272 @@
 # ELSEWHERE — Developer Handbook 
 > Read this before making any changes to the project.
 > This is the single source of truth for Elsewhere.
-> Every AI assistant, every new Cursor session, every future engineer starts here.
-> Last updated: Prompts 0–9 complete. Prompt 10 is next.
+ 
+Elsewhere is a hybrid knowledge-driven world exploration platform.
+
+Every agent, every session, every engineer must understand this before
+touching any code.
+
+OLD thinking (wrong):
+
+"Read from destinations.js"
+"Use the dataset"
+"Check if dataset has this field"
+
+NEW thinking (correct):
+
+"Read from the current Elsewhere Knowledge Object"
+"Use the canonical location object"
+"Check if the location object has this field"
+
+Modules never care which source provided the data.
+They only read the canonical location object.
+This is what makes Elsewhere infinitely scalable.
+
+
+# 1. What Is Elsewhere
+
+Elsewhere is a **cinematic world exploration platform** designed to inspire curiosity, wonder, and discovery.
+
+It is built around a simple idea:
+
+> **People don't travel because they know a place. They travel because they feel something about it.**
+
+Most travel products focus on logistics.
+
+Elsewhere focuses on emotion.
+
+It transforms places into experiences through storytelling, culture, food, history, photography, intelligent recommendations, and cinematic interaction.
+
+The interactive globe is only the entrance.
+
+Every location is a living world with its own identity, atmosphere, stories, traditions, hidden places, and unforgettable experiences.
+
+The journey never truly ends.
+
+Every destination naturally leads to another discovery.
+
+When someone opens Elsewhere, they should feel **wonder within the first three seconds**.
+
+Not information.
+
+Wonder.
 
 ---
 
-## 1. What Is Elsewhere
+# 2. What Elsewhere Is Not
 
-Elsewhere is a **cinematic world exploration platform**.
+Elsewhere deliberately avoids becoming another conventional travel application.
 
-It is not a travel booking website.
-It is not a map application.
-It is not a Wikipedia for destinations.
-It is not a globe viewer.
+| ❌ Elsewhere is NOT              | ✅ Elsewhere IS                                                       |
+| ------------------------------- | -------------------------------------------------------------------- |
+| A travel booking website        | A cinematic discovery platform                                       |
+| A navigation or map application | A world exploration experience                                       |
+| A Wikipedia for destinations    | An immersive storytelling platform                                   |
+| An AI that invents facts        | An AI that reasons over verified knowledge                           |
+| A virtual 3D world simulator    | A gateway to the real world                                          |
+| A static dataset application    | A hybrid knowledge platform powered by live data and curated content |
+| A website that users browse     | A world that users explore                                           |
+| Limited to curated destinations | Designed to scale to every discoverable place on Earth               |
 
-**Elsewhere is the answer to a different question.**
+Every design decision should reinforce this philosophy.
 
-Most travel apps answer: *"Where is this place?"*
-Elsewhere answers: *"What will I feel when I get there?"*
+When choosing between **adding information** and **creating wonder**, choose wonder.
 
-The globe is only the entrance.
-Every location is a world unto itself.
-The experience never ends — every place leads deeper into another.
+When choosing between **building another travel website** and **creating a memorable journey**, choose the journey.
 
-When someone opens Elsewhere they should feel **wonder within 3 seconds**.
-Not information. **Wonder.**
+That principle should guide every feature, every animation, every API integration, and every AI response throughout Elsewhere.
 
----
 
-## 2. What Elsewhere Is Not
 
-| ❌ What it is NOT | ✅ What it IS |
-|---|---|
-| A travel booking site | A cinematic discovery platform |
-| A Google Maps clone | A world exploration engine |
-| A Wikipedia for places | An immersive storytelling experience |
-| An AI that invents facts | An AI that reasons over curated facts |
-| A 3D city renderer | A real photography showcase |
-| A static information page | An infinitely deep recursive journey |
-| A website you browse | A world you explore |
+3. Knowledge Architecture — Most Important Section
 
----
+Current State
 
-## 3. The Complete Experience Flow
+The 50+ curated locations in destinations.js power the experience.
+These are fully rich, hand-crafted, and serve as the foundation.
 
-```
+Dynamic Knowledge Pipeline
+
+Every location — whether curated or not — is represented by one
+canonical Elsewhere Knowledge Object assembled by LocationContextBuilder.
+
+User selects any location
+          │
+          ▼
+   LocationContextBuilder.build(location)
+          │
+   Stage 1 — Facts (all parallel via Promise.allSettled)
+   ┌───────────────────────────────────────────────┐
+   │  Wikipedia      → history, culture, summary   │
+   │  OpenTripMap    → attractions, POIs, gems      │
+   │  OpenWeather    → live weather, conditions     │
+   │  Geoapify       → coordinates, nearby places   │
+   │  Pexels         → photography                  │
+   │  REST Countries → flag, capital, currency      │
+   │  Wikimedia      → media fallback               │
+   └───────────────────────────────────────────────┘
+          │
+          ▼ Promise.allSettled — never fails completely
+   Normalized Elsewhere Knowledge Object assembled
+          │
+   AI Enhancement Layer
+   ┌───────────────────────────────────────────────┐
+   │  Groq receives the Knowledge Object           │
+   │  Groq generates ONLY:                         │
+   │    story, dontMiss, buildMyDay,               │
+   │    Ellie responses, photography tips,          │
+   │    sunrise/romantic/adventure recommendations  │
+   │  Groq is a WRITER — never a database          │
+   │  Groq never invents facts                     │
+   └───────────────────────────────────────────────┘
+          │
+          ▼
+   Complete Knowledge Object cached
+          │
+   UI modules consume the Knowledge Object. They never fetch data directly.
+   ┌─────────────────────────────────────────────┐
+   │  Story     → location.story                 │
+   │  Food      → location.food                  │
+   │  Culture   → location.culture               │
+   │  Seasons   → location.seasons               │
+   │  Discovery → location.hiddenGems            │
+   │  Ellie     → location.aiContext             │
+   └─────────────────────────────────────────────┘
+
+The Transition Rule
+
+The curated destinations.js data IS the Knowledge Object for curated locations.
+Its fields map exactly to the Knowledge Object shape.
+When LocationContextBuilder is active, it produces
+the same shape — modules never need to change.
+
+This is why building modules as pure data consumers was the right decision.
+
+
+4. Canonical Elsewhere Knowledge Object
+
+Every location — country, state, city, landmark, trail, café, waterfall —
+is represented by this canonical shape.
+
+js// The Elsewhere Knowledge Object
+// Source: curated dataset or LocationContextBuilder (dynamic pipeline)
+// Modules never care which source provided this object.
+{
+  // Identity
+  id:               string,
+  name:             string,
+  type:             string,   // 'country'|'state'|'city'|'landmark'|'sublocation'
+  parent:           string | null,
+  lat:              number,
+  lng:              number,
+
+  // Curated content (always present for curated locations)
+  story:            string,         // vivid narrative
+  heroQuote:        string,         // one emotional sentence
+  heroMedia:        { title, imageQuery, atmosphere },
+  visualJourney:    [{ title, imageQuery, description }],
+  photoCollections: { hero, nature, culture, food, night, hidden },
+  ambience:         { soundscape, musicStyle, weatherMood },
+  experiences:      [string],
+  moods:            [string],
+  travelStyle:      [string],
+  aiSummary:        string,         // factual brief for Groq
+
+  // Exploration data
+  wonders:          [...],
+  hiddenGems:       [...],
+  food:             [...],
+  adventures:       [...],
+  seasons:          { spring, summer, autumn, winter },
+  culture:          { history, traditions, festivals, etiquette, dresscode, phrases },
+
+  // Dynamically assembled (added by LocationContextBuilder pipeline)
+  wikipedia:        string | null,  // historical summary
+  attractions:      [...] | null,   // from OpenTripMap
+  weather:          object | null,  // from OpenWeather — never cached permanently
+  country:          object | null,  // from REST Countries
+  images:           [...] | null,   // from Pexels
+
+  // AI-generated layer (Groq, cached in sessionStorage)
+  aiStory:          string | null,
+  dontMiss:         string | null,
+  buildMyDay:       string | null,
+
+  // Resolver metadata
+  _resolved:        boolean,
+  _source:          'curated' | 'api' | 'hybrid'
+}
+
+A country simply has more children than a café.
+The UI never needs to know what type a node is.
+Type only determines camera altitude and filter chips — nothing else.
+
+
+5. The Complete Experience Flow
+
 User opens Elsewhere
         │
-Black screen → stars appear → Earth emerges from darkness
-(atmosphere glows, clouds drift, aurora at poles, city lights shine)
+Black screen → stars → Earth emerges from darkness
+(atmosphere, clouds, aurora, city lights, stars)
         │
 "Every place has a story. Yours is Elsewhere."
         │
 Globe rotates slowly — always alive, never stops
         │
-User searches "Coorg" or clicks a country boundary
+User searches or clicks country boundary
         │
 Camera arcs cinematically through space
-(not a cut — a flight, through clouds, bezier arc)
+(bezier arc, through clouds, not a cut)
         │
 Globe lands. Layout transforms:
-  Globe → slides left → becomes 22% companion
-  LocationWorld → expands right → 78% of screen
+  Globe → 22% left companion (still alive)
+  LocationWorld → 78% right
         │
-Hero image fills the screen
-Hero quote fades in
-Location name appears
-Live weather badge glows
+LocationContextBuilder.build(location) fires
+  Curated location: instant (already in dataset)
+  Unknown location: parallel API calls across data sources
         │
-User explores modules:
-  Story → narrative, experiences, moods, ambience
-  Explore → wonders, hidden gems, adventures
-  Food → dishes, culture, street food
-  Seasons → Spring/Summer/Autumn/Winter
-  Culture → history, traditions, etiquette, language
-  Ellie → AI guide, cinematic text, globe moves mid-response
+Hero image · quote · weather badge · visual journey
         │
-User clicks a Wonder card
+Modules render from Knowledge Object:
+  Story · Explore · Food · Seasons · Culture · Ellie
         │
-pushLevel() fires:
-  Globe companion zooms to landmark altitude
-  Content transitions to sub-location
-  Breadcrumb grows: Elsewhere › India › Karnataka › Coorg › Abbey Falls
+Discovery Engine always at bottom:
+  Continue Your Journey
+  Discover More (filtered)
+  Hidden Local Secrets
+  You May Also Love
+  Don't Miss Before You Leave (Ellie)
+  Build My Day (Ellie)
         │
-Discovery Engine always visible at bottom:
-  Continue Your Journey → stay local, go deeper
-  Discover More (filtered) → Nearby / Same Region / Vibes / Worldwide
-  Hidden Local Secrets → what locals know
-  You May Also Love → same feeling, different world
-  Don't Miss Before You Leave → Ellie speaks automatically
-  Build My Day → Ellie builds Morning→Evening itinerary
+User clicks any card → pushLevel()
+  Globe zooms to correct altitude
+  Content transitions
+  Breadcrumb grows
         │
-The user never hits a dead end.
-Every place leads to another.
-```
+The experience never ends.
+Every place leads deeper into another.
 
----
 
-## 4. The LocationNode — Unified Model
+6. Layout States
 
-**This is the most important architectural decision in Elsewhere.**
-
-Every place — country, state, city, landmark, trail, waterfall,
-café, temple, viewpoint — is the **same object**.
-
-```js
-// LocationNode — every place is this shape
-{
-  id:             string,         // unique identifier
-  name:           string,         // display name
-  type:           string,         // 'country'|'state'|'city'|'landmark'|'sublocation'
-  parent:         string | null,  // parent node id (NOT the full object)
-  lat:            number,         // precise coordinates
-  lng:            number,
-
-  // Content (curated, never AI-generated)
-  story:          string,         // 120-180 words, vivid narrative
-  heroQuote:      string,         // one emotionally engaging sentence
-  heroMedia:      { title, imageQuery, atmosphere },
-  visualJourney:  [{ title, imageQuery, description }],
-  photoCollections: { hero, nature, culture, food, night, hidden },
-  ambience:       { soundscape, musicStyle, weatherMood },
-  experiences:    [string],
-  moods:          [string],
-  travelStyle:    [string],
-  aiSummary:      string,         // factual brief for Groq context
-
-  // Exploration data
-  wonders:        [{ name, description, lat, lng, images, tips, type? }],
-  hiddenGems:     [{ name, whySpecial, bestTime, difficulty, tips, lat, lng }],
-  food:           [{ name, description, culturalSignificance, region, images }],
-  adventures:     [{ name, type, rating, difficulty, season, bookingTip }],
-  seasons:        { spring, summer, autumn, winter },
-  culture:        { history, traditions, festivals, etiquette, dresscode, phrases },
-
-  // Internal resolver fields
-  _resolved:      boolean,
-  _source:        'curated' | 'api'
-}
-```
-
-**The UI never needs to know what type a node is.**
-`type` only determines:
-- Camera altitude on arrival (`LEVEL_ALTITUDE[type]`)
-- Which filter chips appear (`FILTERS_BY_TYPE[type]`)
-
-A country simply has more children than a café.
-The renderer is identical for both.
-
----
-
-## 5. Layout States
-
-Elsewhere has four distinct layout states.
-
-```
 'globe'     Full screen Earth. Search visible. Globe rotates.
-            User feels: wonder, invitation.
+'flying'    Full screen Earth. Camera arcing. Breadcrumb shows.
+'location'  Globe: 22vw left. LocationWorld: 78vw right.
+'deepdive'  Same as location + DeepDive back-nav bar.
 
-'flying'    Full screen Earth. Camera arcing through space.
-            Breadcrumb appears. SearchBar hides.
-            User feels: travelling.
+One React Three Fiber canvas at all times.
+Never create a second EarthScene. Never duplicate the globe.
 
-'location'  Globe: 22vw left companion.
-            LocationWorld: 78vw right.
-            User feels: arrived, immersed.
 
-'deepdive'  Same as location but DeepDive back-nav bar appears.
-            Globe companion zooms to sub-location altitude.
-            User feels: going deeper, discovering.
-```
+7. Camera Altitude System
 
-**One React Three Fiber canvas at all times.**
-Never create a second EarthScene.
-The globe transitions between states — it never disappears and never duplicates.
+Defined in src/data/constants.js — never hardcoded in components.
 
----
-
-## 6. Camera Altitude System
-
-Every node type has a precise camera altitude and flight duration.
-Defined in `src/data/constants.js` — never hardcoded in components.
-
-```js
+js
 LEVEL_ALTITUDE = {
-  earth:        2.8,   // full planet view
+  earth:        2.8,
   continent:    2.1,
   country:      1.8,
   state:        1.35,
@@ -197,306 +278,123 @@ LEVEL_ALTITUDE = {
 LEVEL_DURATION = {
   earth:        0,
   continent:    2.5,
-  country:      3.0,   // longest — crossing the planet
+  country:      3.0,
   state:        1.8,
   city:         1.2,
   landmark:     0.8,
-  sublocation:  0.6    // shortest — local micro-movement
+  sublocation:  0.6
 }
 
-MIN_ALTITUDE = 0.85    // never go below — globe distorts
-```
+MIN_ALTITUDE = 0.85   // never go below — globe distorts
 
-**Going deeper** → altitude decreases, duration decreases.
-**Going back** → camera returns to parent's altitude, not Earth.
-**The globe companion always reflects the current level.**
+Going deeper → altitude decreases, duration decreases.
+Going back → camera returns to parent altitude, not Earth.
 
----
 
-## 7. Data Ownership — Who Owns What
+8. API Stack — Who Owns What
 
-Every piece of data has exactly one owner. Never cross these boundaries.
+Five keys. Two keyless. Zero redundancy.
 
-### Curated Dataset (`destinations.js`)
-**Owns permanently and exclusively:**
-- Coordinates — precise, never AI-generated
-- Story — vivid narrative, human-written
-- Hero quote, hero media, visual journey
-- Culture — history, traditions, festivals, etiquette, phrases
-- Food — dishes, significance, region, cultural context
-- Hidden gems — why special, difficulty, insider tips
-- Adventures — rating, difficulty, booking tips
-- Seasons — temperature, crowd level, events, packing
-- Moods, travel styles, experiences, ambience
-- AI summary — factual brief sent to Groq as context
-- Photo collection queries — Pexels search keywords
+APIOwnsKeyFree TierGroq (llama-3.3-70b)Reasoning, storytelling, Ellie responsesVITE_GROQ_KEY500k tokens/dayPexelsAll photographyVITE_PEXELS_KEY20k req/monthGeoapifyGeocoding + Places + Map tilesVITE_GEOAPIFY_KEY3k req/dayOpenWeatherLive weather onlyVITE_OPENWEATHER_KEY1k req/dayOpenTripMap10M+ POIs, attractionsVITE_OPENTRIPMAP_KEYFree (non-commercial)REST CountriesFlag, capital, currencyNone — public APIUnlimitedWikipediaHistorical summariesNone — public APIUnlimitedWikimedia CommonsImage fallbackNone — public APIUnlimited
 
-**Rule: Never ask Groq to invent these fields.**
-**Rule: Never replace with a live API.**
-**Rule: This is the soul of Elsewhere. Treat it as sacred.**
+Groq is a writer, never a database.
+Groq receives assembled facts → generates human experience.
+Groq never invents coordinates, dish names, or historical events.
 
----
 
-### Pexels API (`imageCache.js`)
-**Owns:** All photography — hero images, cards, galleries, food, seasons.
+9. The Groq Pattern — Critical Rule
 
-**Rules:**
-- Never call Pexels directly from a component
-- Always use `fetchPexelsImage(query)` from `imageCache.js`
-- Always `orientation=landscape`, `large2x` size
-- imageCache stores URL strings in memory — not images, not localStorage
-- Cache resets on tab close — this is intentional
+WRONG:
+  User asks about Coorg
+  → Groq invents everything from scratch
 
----
+CORRECT:
+  User asks about Coorg
+  → Load Knowledge Object (from dataset or LocationContextBuilder)
+  → Send to Groq: story + hiddenGems + food + weather + attractions + aiSummary
+  → Send navigation path: levelHistory
+  → Groq explains it beautifully using only real assembled facts
+  → Groq includes {"flyTo":{"lat":12.33,"lng":75.81,"name":"Coorg"}}
+  → Globe flies there mid-response
 
-### OpenWeather API (`useWeather.js`)
-**Owns:** Live temperature, conditions, humidity, sunrise/sunset.
+Ellie's four modes:
 
-**Rules:**
-- Never cache permanently — weather must be live
-- Never store in destinations.js
-- Never show fallback text on failure — hide badge silently
-- `useWeather(lat, lng)` hook owns all fetch logic
-- Components receive `{ loading, weather, error }` only
+Guide Mode     → location exists, speaks as local guide
+Discovery Mode → no location, acts as travel consultant
+Planner Mode   → user mentions time/budget, builds itinerary
+Explorer Mode  → user says "surprise me", leads the journey
 
----
+Every Groq call receives:
 
-### Groq API — Ellie (`EllieModule.jsx`)
-**Owns:** Reasoning, conversation, recommendations, trip planning.
 
-**Groq does NOT own facts. It reasons over facts.**
+Full navigation path (levelHistory)
+Current Knowledge Object (all fields)
+User message
+Conversation history
 
-```
-WRONG:  User asks about Coorg → Groq invents everything
-CORRECT: User asks about Coorg
-          → Load Coorg node from dataset
-          → Send: story + hiddenGems + food + aiSummary as context
-          → Send: full navigation path (levelHistory)
-          → Groq explains it beautifully using only real facts
-          → Groq includes {"flyTo":{"lat":12.33,"lng":75.81,"name":"Coorg"}}
-          → Globe flies there mid-response
-```
 
-**Ellie's four modes:**
-```
-Guide Mode     → location exists, Ellie acts as local guide
-Discovery Mode → no location, Ellie is travel consultant
-Planner Mode   → user mentions time/budget, Ellie builds itinerary
-Explorer Mode  → user says "surprise me", Ellie leads the journey
-```
 
-**Rules:**
-- Always send full navigation path (`levelHistory`) to every Groq call
-- Always send current location data as context
-- Never let Groq invent coordinates, dish names, historical events
-- Parse `{"flyTo":{...}}` mid-stream → trigger pushLevel or flyTo immediately
-- Strip flyTo JSON from displayed text — user never sees it
+10. NodeResolver
 
----
+src/data/NodeResolver.js
 
-### REST Countries API (`countries.js`)
-**Owns:** Official country name, capital, population, languages, currencies, flag.
-
-**Rules:** Cache in `Map()`. Return `null` gracefully on failure.
-
----
-
-## 8. NodeResolver — Data Orchestration
-
-`src/data/NodeResolver.js` sits between user interaction and the UI.
-The UI never cares where data came from.
-
-```
 resolveNode(query):
-  Step 1 → Check nodeCache (in-memory Map)
-  Step 2 → Check curated dataset (exact match → partial match)
-  Step 3 → Return null (Stage 2 API pipeline, post-launch)
+  1. Check nodeCache (in-memory Map)
+  2. Exact id match in curated dataset
+  3. Exact name match in curated dataset
+  4. Partial name match in curated dataset
+  5. Return null (LocationContextBuilder handles unknown locations)
 
-Stage 2 (post-launch):
-  Nominatim (OSM)   → hierarchy, coordinates, children
-  Wikipedia REST    → historical context for Groq
-  Foursquare Places → restaurants, attractions
-  All normalized into the same LocationNode shape
-```
+When a curated match is unavailable, NodeResolver delegates to
+LocationContextBuilder to construct a Knowledge Object dynamically:
 
-**Current behaviour:** Returns curated nodes only. Returns null gracefully for unknown locations. The UI handles null without crashing.
+  5. LocationContextBuilder.build(query)
+     → Parallel API calls
+     → Returns full Knowledge Object
+     → Cached in nodeCache
 
----
+Modules never know which path was taken.
 
-## 9. Discovery Engine
 
-`src/ui/LocationWorld/discovery/DiscoveryEngine.jsx`
+11. Discovery Engine
 
-Always renders at the bottom of LocationWorld — below all modules.
+Always renders at bottom of LocationWorld — below all modules.
 The user should never think "I've reached the end."
 
-Six sections, each with a distinct purpose:
-
-```
-Continue Your Journey   → depth. Stay local. Go deeper into this place.
-Discover More           → freedom. Filter chips reshape results instantly.
-Hidden Local Secrets    → intimacy. No images. Feels genuinely secret.
+Continue Your Journey   → depth. Local. Go deeper.
+Discover More           → freedom. Filter chips. User chooses scope.
+Hidden Local Secrets    → intimacy. No images. Genuinely secret.
 You May Also Love       → breadth. Same feeling, different world.
-Don't Miss Before Leave → Ellie auto-speaks. sessionStorage cached per location.id.
-Build My Day            → Ellie builds a Morning→Evening itinerary.
-```
+Don't Miss Before Leave → Ellie auto-speaks. sessionStorage cached.
+Build My Day            → Ellie builds Morning→Evening itinerary.
 
-**Filter chips are context-aware by node type.**
-A landmark shows: Nearby / Same Region / Same Country / Similar Vibes / Worldwide / Hidden / Adventure / Photography
-A country shows: Best Regions / Hidden Places / Food Trails / Culture / Worldwide
+Filter chips are context-aware per node type.
+discoveryUtils.js powers all filtering using haversine distance + mood overlap.
 
-**`discoveryUtils.js` powers all filtering** using:
-- Haversine distance formula (true geographic proximity)
-- Mood overlap scoring (Similar Vibes)
-- Dataset field presence checks (Adventure, Photography, Food)
 
----
+12. Zustand Store Shape
 
-## 10. Folder Structure
-
-```
-elsewhere/
-├── public/
-│   └── textures/                          ✅
-│       ├── earth_day_8k.jpg
-│       ├── earth_night.jpg
-│       ├── earth_normal.jpg
-│       ├── earth_specular.jpg
-│       └── earth_clouds.jpg
-│
-├── src/
-│   ├── main.jsx                           ✅
-│   ├── App.jsx                            ✅
-│   │
-│   ├── store/
-│   │   └── useStore.js                   ✅
-│   │
-│   ├── globe/                            ✅
-│   │   ├── EarthScene.jsx
-│   │   ├── Earth.jsx
-│   │   ├── AtmosphereShader.jsx
-│   │   ├── Clouds.jsx
-│   │   ├── Stars.jsx
-│   │   ├── Aurora.jsx
-│   │   ├── DayNight.jsx
-│   │   ├── LocationPin.jsx               ⬜ Prompt 14
-│   │   ├── BucketPin.jsx                 ⬜ Prompt 14
-│   │   ├── CountryBoundaries.jsx         ⬜ Prompt 13
-│   │   └── FlightArc.jsx                 ⬜ Prompt 13
-│   │
-│   ├── camera/                           ✅
-│   │   ├── CameraRig.jsx
-│   │   └── useFlyTo.js
-│   │
-│   ├── hooks/
-│   │   └── useWeather.js                 ✅ Prompt 8
-│   │
-│   ├── ui/
-│   │   ├── SearchBar.jsx                 ✅
-│   │   ├── Breadcrumb.jsx                ✅
-│   │   ├── ZoomIndicator.jsx             ⬜ Prompt 14
-│   │   ├── SurpriseMe.jsx                ⬜ Prompt 13
-│   │   ├── MuteToggle.jsx                ⬜ Prompt 14
-│   │   ├── LoadingScreen.jsx             ⬜ Prompt 15
-│   │   ├── CinematicIntro.jsx            ⬜ Prompt 15
-│   │   ├── AIStrip.jsx                   ⬜ Prompt 12
-│   │   │
-│   │   └── LocationWorld/               ✅ Prompt 7
-│   │       ├── LocationWorld.jsx
-│   │       ├── GlobeCompanion.jsx
-│   │       ├── HeroSection.jsx           ✅ Prompt 8
-│   │       ├── LocationNav.jsx           ✅ Prompt 8
-│   │       ├── WeatherBadge.jsx          ✅ Prompt 8
-│   │       ├── VisualJourney.jsx         ✅ Prompt 8
-│   │       ├── DeepDive.jsx              ⬜ Prompt 10
-│   │       ├── LevelTransition.jsx       ⬜ Prompt 10
-│   │       │
-│   │       ├── modules/
-│   │       │   ├── shared/
-│   │       │   │   ├── ModuleWrapper.jsx ✅ Prompt 9
-│   │       │   │   └── LocationCard.jsx  ✅ Prompt 9
-│   │       │   ├── StoryModule.jsx       ✅ Prompt 9
-│   │       │   ├── ExploreModule.jsx     ✅ Prompt 9
-│   │       │   ├── FoodModule.jsx        ⬜ Prompt 11
-│   │       │   ├── SeasonsModule.jsx     ⬜ Prompt 11
-│   │       │   ├── CultureModule.jsx     ⬜ Prompt 11
-│   │       │   └── EllieModule.jsx       ⬜ Prompt 12
-│   │       │
-│   │       └── discovery/               ⬜ Prompt 10
-│   │           ├── DiscoveryEngine.jsx
-│   │           ├── DiscoveryFilters.jsx
-│   │           ├── ContinueJourney.jsx
-│   │           ├── HiddenSecrets.jsx
-│   │           ├── SimilarVibes.jsx
-│   │           ├── DontMissBeforeYouLeave.jsx
-│   │           └── BuildMyDay.jsx
-│   │
-│   ├── BucketList/
-│   │   ├── BucketPanel.jsx               ⬜ Prompt 14
-│   │   └── BucketCard.jsx                ⬜ Prompt 14
-│   │
-│   ├── audio/
-│   │   └── AudioEngine.js                ⬜ Prompt 16
-│   │
-│   ├── utils/
-│   │   ├── imageCache.js                 ✅
-│   │   └── discoveryUtils.js             ⬜ Prompt 10
-│   │
-│   ├── shaders/                          ✅
-│   │   ├── atmosphere.vert / .frag
-│   │   ├── aurora.vert / .frag
-│   │   ├── nightlights.frag
-│   │   └── bucketPin.frag
-│   │
-│   └── data/                             ✅
-│       ├── constants.js                  ⬜ Prompt 7
-│       ├── destinations.js
-│       ├── countries.js
-│       ├── NodeResolver.js               ⬜ Prompt 10
-│       └── destinations/
-│           ├── index.js
-│           ├── Asia.js
-│           ├── Europe.js
-│           ├── Africa.js
-│           ├── Americas.js
-│           └── Oceania.js
-│
-└── docs/
-    └── ELSEWHERE_ARCHITECTURE.md         ← this file
-```
-
----
-
-## 11. Zustand Store Shape
-
-The full intended store shape. Fields added incrementally per prompt.
-`activeModule` is **local UI state in LocationWorld** — not in Zustand.
-
-```js
+js
 {
   // Layout
   layoutState: 'globe',         // 'globe'|'flying'|'location'|'deepdive'
-  activeLevel: 'earth',         // current node type
+  activeLevel: 'earth',
 
   // Navigation
-  activeLocation: null,         // LocationNode | null
-  levelHistory: [],             // navigation stack — LocationNode[]
-  breadcrumb: ['Elsewhere'],    // display path — string[]
-  navigationDirection: 'forward', // 'forward'|'back' — controls transition
+  activeLocation: null,         // Elsewhere Knowledge Object | null
+  levelHistory: [],             // Knowledge Object stack
+  breadcrumb: ['Elsewhere'],
+  navigationDirection: 'forward',
 
   // Discovery
-  discoveryFilter: 'nearby',    // active filter chip
-  visitedHistory: [],           // last 10 visited location ids
+  discoveryFilter: 'nearby',
+  visitedHistory: [],           // last 10 visited ids
 
-  // Globe pins
+  // Globe
   activePins: [],
 
-  // Bucket List (persisted to localStorage)
-  bucketList: {
-    dream: [],
-    upcoming: [],
-    visited: []
-  },
+  // Bucket List (localStorage persisted)
+  bucketList: { dream:[], upcoming:[], visited:[] },
 
   // Camera
   isFlying: false,
@@ -506,270 +404,142 @@ The full intended store shape. Fields added incrementally per prompt.
   audioMuted: false,
 
   // Ellie
-  lastEllieSuggestion: '',      // shown in AIStrip
-  ellieHistory: [],             // conversation history for Groq
+  lastEllieSuggestion: '',
+  ellieHistory: [],
+  elliePreferences: {},         // crowd:low, style:adventure etc.
 }
-```
 
-**Actions:**
-```
-setLayoutState(state)
-pushLevel(locationNode)         → async, resolves via NodeResolver
-popLevel()                      → returns to parent altitude
-resetToGlobe()                  → full Earth view
-setDiscoveryFilter(filterId)
-addToVisitedHistory(locationId)
-addToBucketList(node, category)
-removeFromBucketList(id, category)
-moveBucketItem(id, from, to)
-setIsFlying(bool)
-setCameraZ(z)                   → called every frame
-toggleMute()
-setLastEllieSuggestion(text)
-```
+activeModule is local UI state in LocationWorld — never in Zustand.
 
----
 
-## 12. Globe Texture Files
+15. Rendering Philosophy
 
-**Never rename, regenerate, replace, or move these files.**
+Real photography over everything else.
 
-| File | Purpose |
-|---|---|
-| `earth_day_8k.jpg` | Primary day surface — NASA Blue Marble |
-| `earth_night.jpg` | City lights on dark side |
-| `earth_normal.jpg` | Terrain bump detail |
-| `earth_specular.jpg` | Ocean specular shine |
-| `earth_clouds.jpg` | Cloud layer — .jpg extension, not .png |
+✅ Real temples, landscapes, streets, mountains, food (Pexels + Wikimedia)
+❌ 3D buildings, AI-generated images, illustrations, stock vectors
 
----
-
-## 13. Rendering Philosophy
-
-### Real Photography Over Everything
-```
-✅ Real temples, landscapes, streets, mountains, food (Pexels)
-❌ 3D buildings, generated imagery, illustrations, AI-generated photos
-```
-
-Every image must make the user feel like they could step through the screen.
-
-### Globe Visual Standard
-Every globe decision must pass: *"Does this look like a $200M travel documentary?"*
+Globe visual standard:
+Every decision must pass: "Does this look like a $200M travel documentary?"
 
 Globe render layers (in order):
-1. Earth sphere — 8K texture, specular ocean, normal terrain
-2. Night lights — city glow via GLSL blend
-3. Cloud layer — rotating at 0.7× Earth speed
-4. Atmosphere — Fresnel blue rim glow
-5. Aurora — GLSL sine wave, poles only, night side
-6. Postprocessing — Bloom, Vignette, ChromaticAberration
 
----
 
-## 14. Animation Philosophy
+Earth sphere — 8K texture, specular ocean, normal terrain
+Night lights — city glow via GLSL blend
+Cloud layer — rotating 0.7× Earth speed
+Atmosphere — Fresnel blue rim glow
+Aurora — GLSL sine wave, poles only, night side
+Postprocessing — Bloom, Vignette, ChromaticAberration
 
-**Nothing snaps. Nothing jumps. Every transition is earned.**
 
-| Interaction | Principle | Implementation |
-|---|---|---|
-| Globe → companion | World steps aside | Framer Motion layout, 1.2s |
-| LocationWorld reveal | Arrives after globe settles | 0.8s delay 0.5s |
-| Camera fly-to | Cinematic arc, not straight line | GSAP + CatmullRomCurve3 |
-| Level deepdive | Forward slide left | AnimatePresence, 0.3s |
-| Level back | Reverse slide right | navigationDirection flag |
-| Card hover | Subtle lift + image scale | translateY(-3px), scale 1.06 |
-| Module entrance | Fades up from below | Framer Motion y:24→0 |
-| Card stagger | Sequential entrance | react-spring, 70ms apart |
-| Ellie text | Typewriter character stream | getReader() per token |
-| Globe idle | Never fully stops | velX minimum 0.0008 |
 
----
+16. Animation Philosophy
 
-## 15. Performance Principles
+Nothing snaps. Nothing jumps. Every transition is earned.
 
-**Target: 60fps at all times. Non-negotiable.**
-r3f-perf runs throughout development.
-Do not proceed to next prompt if FPS drops below 55.
+InteractionPrincipleTargetGlobe → companionWorld steps aside1.2s Framer Motion layoutLocationWorld revealAfter globe settles0.8s delay 0.5sCamera fly-toCinematic arcGSAP + CatmullRomCurve3Level deepdiveForward slides leftAnimatePresence 0.3sLevel backReverse slides rightnavigationDirection flagModule entranceFades upFramer Motion y:24→0Card staggerSequentialreact-spring 70ms apartEllie textTypewriter streamgetReader() per tokenGlobe idleNever stopsvelX minimum 0.0008
 
-**Non-negotiable rules:**
-- One React Three Fiber canvas — never duplicate
-- GPU transforms only — never animate layout properties
-- One scroll listener per scroll container — owned by parent, passed as prop
-- Cache all Pexels responses — never repeat the same query
-- requestAnimationFrame only — never setInterval
-- Strip Leva and r3f-perf from production build
 
-**Implementation guidance:**
-- React.memo on all module and card components
-- useCallback on globe event handlers
-- useMemo on dataset filters and discovery computations
-- IntersectionObserver for lazy image loading
-- Debounce API calls 300ms
-- LOD on globe sphere (segments 128 → 64 at far zoom)
+17. Performance Principles
 
----
+Target: 60fps at all times. Non-negotiable.
 
-## 16. Development Philosophy
 
-**Architecture before implementation.**
+One React Three Fiber canvas — never duplicate
+GPU transforms only — never animate layout properties
+One scroll listener per container — owned by parent, passed as prop
+Promise.allSettled for parallel API calls — never Promise.all
+Cache Knowledge Objects in nodeCache after first build
+Cache Groq responses in sessionStorage per location.id
+Cache Pexels responses in imageCache.js in-memory Map
+Never cache weather permanently — always live
+requestAnimationFrame only — never setInterval
+React.memo on all module components
+useMemo on all dataset/discovery computations
+Strip Leva and r3f-perf from production build
+
+ 
+
+Development Philosophy
+
+Architecture before implementation.
 Understand the full system before writing a single line.
 
-**Surgical changes over rewrites.**
+Surgical changes over rewrites.
 Only touch files listed in the current prompt.
-If something works, protect it.
 
-**One feature at a time.**
-Complete each prompt fully. Run the checkpoint. Then proceed.
+One feature at a time.
+Complete each prompt fully. Checkpoint passes. Then proceed.
 
-**Checkpoints are contracts.**
-Not "mostly works." Fully passes. Every item checked.
+Checkpoints are contracts.
+Not "mostly works." Fully passes every item. Every time.
 
-**Data is curated, never generated.**
-The dataset is the soul of Elsewhere.
-Groq reasons over it. It never replaces it.
+Knowledge Object over dataset.
+Components consume the canonical location object.
+They never care whether it came from destinations.js or the API pipeline.
 
-**Rendering is cinematic.**
-If it looks like a default, it is not finished.
+Groq is a writer, never a database.
+Facts come from APIs and curated data.
+Groq transforms facts into the human experience.
 
-**Performance is a feature.**
-60fps is not a bonus. It is part of the experience.
+The user should never reach a dead end.
+Every location leads to another.
+Discovery Engine is always at the bottom.
 
-**Real photography over generated visuals.**
-Pexels photography only. Never 3D cities or AI images.
+Real photography over generated visuals.
+Pexels primary. Wikimedia fallback. Never AI-generated.
 
-**The user should never reach a dead end.**
-Every location leads somewhere else.
-The Discovery Engine is always at the bottom of every page.
+Performance is a feature.
+60fps is not a bonus. It is the experience.
 
-**Documentation evolves with the codebase.**
-Update this file when filenames, store fields, or APIs change.
+Documentation evolves with the codebase.
+Update this file when anything changes.
 Drifted documentation is worse than no documentation.
 
----
+Environment Variables
 
-## 17. Coding Rules
+| API            | Responsibility              | Key                    | Free Tier          |
+| -------------- | --------------------------- | ---------------------- | ------------------ |
+| Groq           | AI reasoning & storytelling | `VITE_GROQ_KEY`        | 500k tokens/day    |
+| Pexels         | Photography                 | `VITE_PEXELS_KEY`      | 20k requests/month |
+| Geoapify       | Geocoding, Places, Tiles    | `VITE_GEOAPIFY_KEY`    | 3k/day             |
+| OpenWeather    | Live weather                | `VITE_OPENWEATHER_KEY` | 1k/day             |
+| OpenTripMap    | Attractions & POIs          | `VITE_OPENTRIPMAP_KEY` | Free               |
+| REST Countries | Country metadata            | None                   | Unlimited          |
+| Wikipedia      | Historical summaries        | None                   | Unlimited          |
+| Wikimedia      | Image fallback              | None                   | Unlimited          |
 
-```
+
+Never commit .env to git.
+Never hardcode keys in source files.
+OpenTileMap is covered by Geoapify — no separate key needed.
+REST Countries has no API key — never add VITE_REST_COUNTRIES_KEY.
+
+
+Coding Rules
+
+✅ Components consume Knowledge Object — never fetch independently
 ✅ Every file fully implemented — no TODOs, no placeholders
-✅ Build incrementally on top of what works
+✅ Build incrementally — never rewrite what works
 ✅ Touch only files listed in the current prompt
-✅ Never rename texture files
-✅ Never regenerate curated location data
-✅ Use activeLocation not activeDestination in new code
-✅ Props-down for presentational components — no Zustand in leaves
-✅ imageCache.js for ALL Pexels fetches — never call API directly
-✅ Send location context + navigation path to every Groq call
-✅ Run checkpoint before proceeding to next prompt
-✅ Confirm 60fps before proceeding
+✅ props-down for all presentational components
+✅ imageCache.js for ALL Pexels fetches
+✅ Promise.allSettled for parallel API calls
+✅ Send full Knowledge Object + navigation path to every Groq call
+✅ Confirm 60fps before proceeding to next prompt
+✅ Checkpoint passes before next prompt begins
 
 ❌ No second R3F canvas — ever
-❌ No straight-line camera movement — always CatmullRomCurve3 arc
-❌ No direct Pexels calls from components
-❌ No Groq calls that bypass location context
+❌ No straight-line camera — always CatmullRomCurve3 arc
+❌ No direct API calls from UI components
+❌ No Groq calls that bypass Knowledge Object context
 ❌ No AI-invented coordinates, dish names, or history
 ❌ No permanent weather caching
 ❌ No hardcoded image URLs
 ❌ No layout property animations — GPU transforms only
-❌ No multiple scroll listeners in the same container
-❌ No Prettier/linting changes when only logic changes are needed
-```
+❌ No multiple scroll listeners in same container
+❌ No "dataset" thinking — think "Knowledge Object"
 
----
 
-## 18. Build Order
 
-| Prompt | Feature | Status |
-|---|---|---|
-| 0 | Scaffold — folders, packages, imageCache | ✅ |
-| 1 | Globe — sphere, stars, drag, zoom, Bloom | ✅ |
-| 2 | Shaders — atmosphere, clouds, aurora, day/night | ✅ |
-| 3 | Zustand store | ✅ |
-| 4 | Camera — CameraRig, flyTo, CatmullRomCurve3 arc | ✅ |
-| 5A–D | Locations dataset — 50+ entries, all fields | ✅ |
-| 5R | Data refactor — continent files, index.js | ✅ |
-| 6 | Search bar + Breadcrumb | ✅ |
-| 7 | Layout transformation — globe companion + LocationWorld | ✅ |
-| 8 | Location hero — image, quote, weather, visual journey, nav | ✅ |
-| 9 | Story module + Explore module + LocationCard | ✅ |
-| 10 | NodeResolver + Discovery Engine (all 6 sections) | ⬜ Next |
-| 11 | Food + Seasons + Culture modules | ⬜ |
-| 12 | Ellie — 4 modes, cinematic text, globe moves mid-stream | ⬜ |
-| 13 | Surprise Me + Country boundaries + Flight arc | ⬜ |
-| 14 | Bucket list + Globe pins + UI widgets | ⬜ |
-| 15 | Opening cinematic + Loading screen | ⬜ |
-| 16 | Spatial audio — Tone.js | ⬜ |
-| 17 | Production cleanup + Mobile + Ship | ⬜ |
-
-Total: 17 build prompts (0–17) + 5 data sub-prompts (5A–5D, 5R)
-
----
-
-## 19. Post-Launch Roadmap (Stage 2)
-
-Do not build these now. Do not let them influence current decisions.
-
-**NodeResolver API pipeline:**
-Nominatim (OSM) → hierarchy + coordinates
-Wikipedia REST → historical context for Groq
-Foursquare → restaurants, attractions
-Enables recursive depth beyond curated 50+ locations.
-
-**User accounts:**
-Supabase → personal bucket lists synced across devices
-
-**Community features:**
-User-submitted hidden gems, ratings, local tips
-
-**Trip planner:**
-Ellie builds multi-destination itineraries with real routing
-
-**Globe upgrade:**
-MeshStandardMaterial + PBR rendering
-Volumetric atmosphere (Rayleigh + Mie scattering)
-Mapbox satellite tile streaming at deep zoom levels
-
----
-
-## 20. Environment Variables
-
-```
-VITE_PEXELS_KEY        → pexels.com/api (free, instant, no approval)
-VITE_GROQ_KEY          → console.groq.com (free, no card needed)
-VITE_OPENWEATHER_KEY   → openweathermap.org/api (free tier, 1000/day)
-```
-
-Never commit `.env` to git.
-Never hardcode keys in source files.
-
----
-
-## 21. How to Use This Document
-
-**Start every Cursor session with:**
-```
-Read docs/ELSEWHERE_ARCHITECTURE.md before making any changes.
-```
-
-**Start every prompt with:**
-```
-Project: Elsewhere V2
-Read docs/ELSEWHERE_ARCHITECTURE.md before making any changes.
-Prompts 0–N are complete.
-```
-
-**When something feels wrong, check:**
-1. Am I touching files not listed in this prompt?
-2. Am I calling Pexels directly instead of through imageCache?
-3. Am I letting Groq invent facts instead of reasoning over context?
-4. Am I animating layout properties instead of GPU transforms?
-5. Am I below 60fps?
-6. Am I creating a second R3F canvas?
-
-If any answer is yes — stop immediately and reconsider.
-
----
-
-*Update the Build Order table (Section 18) after every prompt completes.*
-*Update folder structure (Section 10) as new files are created.*
-*This document is a living record of Elsewhere — keep it accurate.*

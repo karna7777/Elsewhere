@@ -4,6 +4,7 @@ import useStore from '../../store/useStore'
 import HeroSection from './HeroSection'
 import LocationNav, { getAvailableModules } from './LocationNav'
 import DiscoveryEngine from './discovery/DiscoveryEngine'
+import AIStrip from '../AIStrip'
 
 // Modules are code-split. Story, Explore and Food are implemented.
 const StoryModule = lazy(() => import('./modules/StoryModule'))
@@ -11,6 +12,7 @@ const ExploreModule = lazy(() => import('./modules/ExploreModule'))
 const FoodModule = lazy(() => import('./modules/FoodModule'))
 const SeasonsModule = lazy(() => import('./modules/SeasonsModule'))
 const CultureModule = lazy(() => import('./modules/CultureModule'))
+const EllieModule = lazy(() => import('./modules/EllieModule'))
 
 function ComingSoon({ name }) {
   return (
@@ -83,9 +85,15 @@ export default function LocationWorld() {
   // Hierarchy path reuses existing breadcrumb data (drop the 'Elsewhere' root).
   const hierarchy = breadcrumb.slice(1)
 
+  // The location panel only mounts in 'location' mode (78vw, right-aligned); any
+  // other state shows the globe full-screen. The strip insets to 22vw to sit under
+  // the panel, else spans full width.
+  const isGlobeMode = layoutState !== 'location'
+
   return (
-    <AnimatePresence>
-      {layoutState === 'location' && activeLocation && (
+    <>
+      <AnimatePresence>
+        {layoutState === 'location' && activeLocation && (
         <motion.section
           key="location-world"
           initial={{ opacity: 0, x: 80 }}
@@ -147,11 +155,18 @@ export default function LocationWorld() {
                 {activeModule === 'food' && <FoodModule location={activeLocation} />}
                 {activeModule === 'seasons' && <SeasonsModule location={activeLocation} />}
                 {activeModule === 'culture' && <CultureModule location={activeLocation} />}
+                {activeModule === 'ellie' && (
+                  <EllieModule
+                    activeLocation={activeLocation}
+                    setActiveModule={setActiveModule}
+                  />
+                )}
                 {activeModule !== 'story' &&
                   activeModule !== 'explore' &&
                   activeModule !== 'food' &&
                   activeModule !== 'seasons' &&
-                  activeModule !== 'culture' && <ComingSoon name={activeModule} />}
+                  activeModule !== 'culture' &&
+                  activeModule !== 'ellie' && <ComingSoon name={activeModule} />}
               </Suspense>
             </div>
 
@@ -166,7 +181,12 @@ export default function LocationWorld() {
             />
           </div>
         </motion.section>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+
+      {/* Persistent companion strip — mounted once, outside the module router, so
+          it survives module/location changes and stays present in globe mode. */}
+      <AIStrip setActiveModule={setActiveModule} isGlobeMode={isGlobeMode} />
+    </>
   )
 }

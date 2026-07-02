@@ -45,11 +45,14 @@ const useStore = create(
       (set) => ({
         // BACKWARDS-COMPAT ONLY. levelHistory + its tail (activeLocation) are the
         // real source of truth; activeDestination is kept as a synchronized mirror
-        // of levelHistory[last] for existing consumers and will be removed after
-        // Prompt 12. Do not build new features against it.
+        // of levelHistory[last] for existing consumers and is slated for removal.
+        // Do not build new features against it.
         activeDestination: null,
         activePins: [],
         bucketList: { ...EMPTY_BUCKET_LIST },
+        // Bucket List panel visibility. In-memory only — never persisted, so the
+        // panel always starts closed on load (only bucketList contents survive).
+        bucketPanelOpen: false,
         panelOpen: false,
         activeTab: 'overview',
         expandedCard: null,
@@ -57,7 +60,7 @@ const useStore = create(
         isFlying: false,
         layoutState: 'globe', // 'globe' | 'flying' | 'location'
         breadcrumb: ['Elsewhere'],
-        // Navigation backbone (Prompt 10A). Invariant maintained everywhere:
+        // Navigation backbone. Invariant maintained everywhere:
         //   activeDestination === levelHistory[levelHistory.length - 1]  (or null)
         levelHistory: [],
         // Recently visited node ids — newest first, unique, max 10.
@@ -65,8 +68,25 @@ const useStore = create(
         // Active discovery lens (presentation only — never owns navigation).
         // Resets to 'nearby' whenever a new level is entered.
         discoveryFilter: 'nearby',
+        // Ellie conversation state (12B-A). ellieStreamText holds the in-flight
+        // streamed reply; ellieHistory is the rolling user/assistant transcript.
+        ellieMode: 'guide', // 'guide' | 'discovery'
+        ellieHistory: [],
+        ellieStreamText: '',
+        // Sticky conversation subject (12D-A) so follow-ups keep refining the same
+        // thread: guide | planner | food | photography | history | culture |
+        // weather | general. Updated after each successful reply. In-memory only.
+        ellieConversationTopic: 'general',
+        // True between send and the first streamed token — drives the "thinking"
+        // indicator. Never persisted.
+        ellieThinking: false,
         cameraZ: 2.8,
         lastAISuggestion: '',
+        // Latest visible Ellie sentence for the persistent AIStrip (12C-B). Holds
+        // ONLY the most recent successfully-completed reply (JSON-free, ≤120 chars).
+        // Never persisted, no history, no streaming state — just the one line the
+        // strip shows. Updated solely on successful completion, never mid-stream.
+        lastEllieSuggestion: '',
 
         // Entry point (search, Surprise Me, pins, AI, bucket list). RESETS the
         // navigation stack to a single root level. Callers pass a node already
@@ -174,6 +194,13 @@ const useStore = create(
         // Discovery is presentation only — switching the lens never navigates.
         setDiscoveryFilter: (id) => set({ discoveryFilter: id }),
 
+        // Ellie (12B-A). Plain setters — the streaming/cap logic lives in EllieModule.
+        setEllieMode: (mode) => set({ ellieMode: mode }),
+        setEllieHistory: (history) => set({ ellieHistory: history }),
+        setEllieStreamText: (text) => set({ ellieStreamText: text }),
+        setEllieConversationTopic: (topic) => set({ ellieConversationTopic: topic }),
+        setEllieThinking: (thinking) => set({ ellieThinking: thinking }),
+
         setCameraZ: (z) => set({ cameraZ: z }),
 
         addToBucketList: (dest, category) =>
@@ -199,6 +226,51 @@ const useStore = create(
             },
           })),
 
+        // Bucket mutations (14B). Canonical names used by the Bucket Panel.
+        // addToBucket enforces a single home per id: adding an item that already
+        // lives in another category MOVES it (remove old → insert new), never
+        // duplicates. Only categories that actually change get a new array
+        // reference, so unaffected columns don't re-render.
+        addToBucket: (item, category) =>
+          set((state) => {
+            const id = itemId(item)
+            if (id == null) return state
+            const bl = state.bucketList
+            const next = { ...bl }
+            let changed = false
+            for (const cat of Object.keys(bl)) {
+              if (cat === category) continue
+              if (bl[cat].some((e) => itemId(e) === id)) {
+                next[cat] = bl[cat].filter((e) => itemId(e) !== id)
+                changed = true
+              }
+            }
+            const target = next[category] ?? []
+            if (target.some((e) => itemId(e) === id)) {
+              return changed ? { bucketList: next } : state
+            }
+            next[category] = [...target, item] // append — preserve insertion order
+            return { bucketList: next }
+          }),
+
+        // Remove by id from wherever it lives (category-agnostic). Only rebuilds
+        // the category that actually held the item.
+        removeFromBucket: (id) =>
+          set((state) => {
+            const bl = state.bucketList
+            for (const cat of Object.keys(bl)) {
+              if (bl[cat].some((e) => itemId(e) === id)) {
+                return {
+                  bucketList: {
+                    ...bl,
+                    [cat]: bl[cat].filter((e) => itemId(e) !== id),
+                  },
+                }
+              }
+            }
+            return state
+          }),
+
         moveBucketItem: (id, fromCat, toCat) =>
           set((state) => {
             const fromList = state.bucketList[fromCat] ?? []
@@ -217,7 +289,17 @@ const useStore = create(
             }
           }),
 
+        // Bucket List panel controls (14A). Data mutation (add/remove/move) is
+        // handled by the existing bucket actions above; these only drive the shell.
+        openBucketPanel: () => set({ bucketPanelOpen: true }),
+        closeBucketPanel: () => set({ bucketPanelOpen: false }),
+        toggleBucketPanel: () =>
+          set((state) => ({ bucketPanelOpen: !state.bucketPanelOpen })),
+        setBucketList: (nextBucketList) => set({ bucketList: nextBucketList }),
+
         setLastAISuggestion: (text) => set({ lastAISuggestion: text }),
+
+        setLastEllieSuggestion: (text) => set({ lastEllieSuggestion: text }),
 
         pushBreadcrumb: (label) =>
           set((state) => ({ breadcrumb: [...state.breadcrumb, label] })),
@@ -251,7 +333,7 @@ export const useLevelHistory = () => useStore((s) => s.levelHistory)
 export const useVisitedHistory = () => useStore((s) => s.visitedHistory)
 export const useDiscoveryFilter = () => useStore((s) => s.discoveryFilter)
 // Forward-looking source-of-truth accessor (the levelHistory tail). New code
-// should prefer this over activeDestination, which is removed after Prompt 12.
+// should prefer this over activeDestination, which is being phased out.
 export const useActiveLocation = () =>
   useStore((s) => s.levelHistory[s.levelHistory.length - 1] ?? null)
 export const usePanelOpen = () => useStore((s) => s.panelOpen)

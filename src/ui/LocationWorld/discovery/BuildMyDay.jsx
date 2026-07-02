@@ -243,8 +243,7 @@ function BuildMyDay({ activeLocation, setActiveModule }) {
         </p>
       )}
 
-      {/* Prompt 12:
-          Ellie will be able to refine this itinerary in chat. */}
+      {/* Ellie will be able to refine this itinerary in chat. */}
       <button
         type="button"
         className="bmd-refine"

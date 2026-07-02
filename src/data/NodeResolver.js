@@ -6,7 +6,7 @@ import { LOCATION_TYPES } from '../constants.js'
 //
 // Single responsibility: turn a query into a normalized, immutable LocationNode.
 // It NEVER discovers nearby places, computes similarity/recommendations, filters,
-// or ranks — that is the DiscoveryEngine's job (Prompt 10B). The curated dataset
+// or ranks — that is the DiscoveryEngine's job. The curated dataset
 // is never mutated; every result is a fresh spread copy tagged `_resolved`.
 //
 // ── LocationNode contract ────────────────────────────────────────────────────

@@ -1,14 +1,25 @@
 import { Component, Suspense, useEffect, useRef } from 'react'
 import { useFrame, useThree, useLoader } from '@react-three/fiber'
 import { useControls } from 'leva'
-import { TextureLoader, SRGBColorSpace, MathUtils } from 'three'
+import { TextureLoader, SRGBColorSpace, MathUtils, Quaternion, Vector3 } from 'three'
+import gsap from 'gsap'
 import useStore from '../store/useStore'
+import { latLngToUnit } from '../hooks/useFlyTo'
 
 const FALLBACK_COLOR = '#2266aa'
 const DECAY = 0.92
 const MIN_VEL = 0.0008
 const ZOOM_LERP = 0.08
 const DRAG_SENSITIVITY = 0.005
+// Country focus: a camera-only centroid fly for countries with no curated
+// Knowledge Object yet. Reuses the SAME camera model as useFlyTo (globe
+// rotates so the target faces +Z; camera only changes zoom depth) but never
+// enters navigation — no setIsFlying, no pushLevel, so we stay in Globe Mode.
+const FOCUS_Z = 2.2 // gentle country view; stays above CountryBoundaries' VISIBLE_Z (2.0)
+const FOCUS_DURATION = 1.6
+const _faceZ = new Vector3(0, 0, 1)
+const _startQuat = new Quaternion()
+const _endQuat = new Quaternion()
 
 class TextureErrorBoundary extends Component {
   constructor(props) {
@@ -92,6 +103,13 @@ export default function Earth() {
   // locked on the +Z axis (centered in view). The hold is released the moment
   // the user interacts (drags), at which point normal idle rotation resumes.
   const rotationHold = useRef(false)
+  // Surprise Me: true while the dramatic GSAP spin runs. Yields idle rotation to
+  // GSAP and locks user interaction (drag/zoom) until it completes.
+  const spinning = useRef(false)
+  // Country focus: true while the camera-only centroid fly runs.
+  // Yields idle rotation + zoom to the GSAP tween and locks interaction, exactly
+  // like `spinning`. We never enter navigation, so we remain in Globe Mode.
+  const focusing = useRef(false)
 
   const { rotationSpeed, minZoom, maxZoom } = useControls(
     'Earth',
@@ -105,6 +123,7 @@ export default function Earth() {
 
   const handlers = {
     onPointerDown: (e) => {
+      if (spinning.current || focusing.current) return // locked during spin / focus fly
       e.stopPropagation()
       // User is taking control — release any post-flight rotation lock.
       rotationHold.current = false
@@ -136,6 +155,7 @@ export default function Earth() {
 
     const onWheel = (e) => {
       e.preventDefault()
+      if (spinning.current || focusing.current) return // zoom locked during spin / focus fly
       targetZoom.current = MathUtils.clamp(
         targetZoom.current + e.deltaY * 0.002,
         minZoom,
@@ -144,6 +164,7 @@ export default function Earth() {
     }
 
     const onTouchStart = (e) => {
+      if (spinning.current || focusing.current) return // pinch-zoom locked during spin / focus fly
       if (e.touches.length !== 2) return
       const dx = e.touches[0].clientX - e.touches[1].clientX
       const dy = e.touches[0].clientY - e.touches[1].clientY
@@ -181,11 +202,95 @@ export default function Earth() {
       rotationHold.current = true
     }
 
+    // Surprise Me: a dramatic spin of the EXISTING globe mesh — no second
+    // animation system. GSAP (already the app's tween engine) drives
+    // rotation.y through several revolutions with powerful easing: fast build-up,
+    // cinematic slowdown. Idle rotation + interaction stay locked via `spinning`.
+    const onSurpriseSpin = () => {
+      const mesh = meshRef.current
+      if (!mesh || spinning.current) return
+      spinning.current = true
+      velocity.current.x = 0
+      velocity.current.y = 0
+      rotationHold.current = false
+      gsap.to(mesh.rotation, {
+        y: mesh.rotation.y + Math.PI * 2 * 5,
+        duration: 2,
+        ease: 'power4.inOut',
+        overwrite: true,
+        onComplete: () => {
+          spinning.current = false
+          // The globe has chosen — let the orchestrator initiate navigation.
+          window.dispatchEvent(new Event('surprise-spin-complete'))
+        },
+      })
+    }
+
+    // Country focus: a camera-only centroid fly for a country that has NO curated
+    // Knowledge Object yet. CountryBoundaries only asks (it owns
+    // no camera); Earth — which already owns the globe rotation, zoom target and
+    // GSAP — performs the move. It uses the same camera model as useFlyTo (globe
+    // rotates so the centroid faces +Z; camera only changes zoom), but never
+    // calls setIsFlying / pushLevel, so the app stays in Globe Mode. When a real
+    // Knowledge Object exists later, CountryBoundaries routes through pushLevel
+    // instead and this path is not taken.
+    const onCountryFocus = (e) => {
+      const mesh = meshRef.current
+      if (!mesh || spinning.current || focusing.current) return
+      if (useStore.getState().isFlying) return // never fight an in-flight navigation
+      const { lat, lng } = e.detail || {}
+      if (lat == null || lng == null) return
+
+      focusing.current = true
+      velocity.current.x = 0
+      velocity.current.y = 0
+      rotationHold.current = false
+
+      _startQuat.copy(mesh.quaternion)
+      _endQuat.setFromUnitVectors(latLngToUnit(lat, lng), _faceZ)
+      const startZ = camera.position.z
+      const endZ = MathUtils.clamp(FOCUS_Z, minZoom, maxZoom)
+      const p = { t: 0 }
+
+      const focusTween = gsap.to(p, {
+        t: 1,
+        duration: FOCUS_DURATION,
+        ease: 'power3.inOut',
+        overwrite: true,
+        onUpdate: () => {
+          // Yield instantly if a REAL navigation began mid-focus (e.g. a curated
+          // country was clicked): flyTo now owns the globe quaternion + camera, so
+          // stop writing them and let the flight take over cleanly — no fight.
+          if (useStore.getState().isFlying) {
+            focusing.current = false
+            focusTween.kill()
+            return
+          }
+          // Drive rotation + zoom directly: useFrame yields while focusing, so
+          // nothing here is fought by the idle loop.
+          mesh.quaternion.copy(_startQuat).slerp(_endQuat, p.t)
+          camera.position.z = MathUtils.lerp(startZ, endZ, p.t)
+        },
+        onComplete: () => {
+          focusing.current = false
+          // A flight may have started on the last frame — don't stomp its state.
+          if (useStore.getState().isFlying) return
+          // Adopt the landed zoom so the resumed idle lerp doesn't snap it back,
+          // and hold the globe still so the country stays centred until the user
+          // grabs it — mirrors the post-fly-to behaviour.
+          targetZoom.current = camera.position.z
+          rotationHold.current = true
+        },
+      })
+    }
+
     el.addEventListener('wheel', onWheel, { passive: false })
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchmove', onTouchMove, { passive: true })
     el.addEventListener('touchend', onTouchEnd)
     window.addEventListener('fly-complete', onFlyComplete)
+    window.addEventListener('surprise-spin', onSurpriseSpin)
+    window.addEventListener('country-focus', onCountryFocus)
 
     return () => {
       el.removeEventListener('wheel', onWheel)
@@ -193,12 +298,18 @@ export default function Earth() {
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
       window.removeEventListener('fly-complete', onFlyComplete)
+      window.removeEventListener('surprise-spin', onSurpriseSpin)
+      window.removeEventListener('country-focus', onCountryFocus)
     }
-  }, [gl, minZoom, maxZoom])
+  }, [gl, camera, minZoom, maxZoom])
 
   useFrame(() => {
     const mesh = meshRef.current
     if (!mesh) return
+
+    // During the surprise spin, GSAP owns rotation.y — yield idle rotation and
+    // zoom entirely so nothing fights the tween (globe mode only, never flying).
+    if (spinning.current) return
 
     // Read flying state directly from store (no React subscription needed in frame loop)
     const flying = useStore.getState().isFlying

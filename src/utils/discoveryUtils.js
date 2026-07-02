@@ -2,7 +2,7 @@ import destinations from '../data/destinations.js'
 import { resolveNode } from '../data/NodeResolver.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// discoveryUtils — PURE discovery algorithms (Prompt 10B-A foundation).
+// discoveryUtils — PURE discovery algorithms.
 //
 // No React. No Zustand. No API calls (no Pexels/Groq/Weather). No async. Given the
 // same (node, radius, limit) these always return the same output. The curated
