@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
+import gsap from 'gsap'
+import { DefaultLoadingManager } from 'three'
 import EarthScene from './globe/EarthScene'
 import SearchBar from './ui/SearchBar'
 import Breadcrumb from './ui/Breadcrumb'
@@ -9,6 +11,8 @@ import SurpriseMe from './ui/SurpriseMe'
 import BucketPanel from './ui/BucketList/BucketPanel'
 import ZoomIndicator from './ui/ZoomIndicator'
 import MuteToggle from './ui/MuteToggle'
+import LoadingScreen from './ui/LoadingScreen'
+import CinematicIntro from './ui/CinematicIntro'
 import useStore from './store/useStore'
 
 // Companion column target width (matches GlobeCompanion / LocationWorld split).
@@ -22,6 +26,71 @@ export default function App() {
   const layoutState = useStore((s) => s.layoutState)
   const setLayoutState = useStore((s) => s.setLayoutState)
   const toggleBucketPanel = useStore((s) => s.toggleBucketPanel)
+
+  // The opening experience runs through a single phase: the black loading
+  // overlay, then the cinematic title sequence, then the live application.
+  const [phase, setPhase] = useState('loading') // 'loading' | 'cinematic' | 'ready'
+  const [progress, setProgress] = useState(0)
+
+  const overlayRef = useRef(null)
+  const wordmarkRef = useRef(null)
+  const progressRef = useRef(null)
+  const startedRef = useRef(false)
+  const timelineRef = useRef(null)
+
+  // Track real Three.js asset loading (globe textures) and, once the scene is
+  // ready, play the loading overlay out before revealing the cinematic. A safety
+  // timeout guarantees the intro always proceeds even if onLoad never fires
+  // (e.g. fully cached assets that finished before this listener attached).
+  useEffect(() => {
+    const manager = DefaultLoadingManager
+    const STALL_MS = 5000
+    let stallTimer
+
+    const finish = () => {
+      if (startedRef.current) return // run exactly once
+      startedRef.current = true
+      clearTimeout(stallTimer)
+      setProgress(100)
+
+      // Pause the wordmark pulse so it doesn't shimmer beneath the fade-out.
+      const mark = wordmarkRef.current?.querySelector('.els-wordmark')
+      if (mark) mark.style.animationPlayState = 'paused'
+
+      const tl = gsap.timeline({ onComplete: () => setPhase('cinematic') })
+      timelineRef.current = tl
+      if (progressRef.current) tl.to(progressRef.current, { opacity: 0, duration: 0.4, ease: 'power2.out' })
+      if (wordmarkRef.current) tl.to(wordmarkRef.current, { opacity: 0, duration: 0.5, ease: 'power2.out' }, '-=0.15')
+      if (overlayRef.current) tl.to(overlayRef.current, { opacity: 0, duration: 0.6, ease: 'power2.inOut' }, '-=0.1')
+      tl.to({}, { duration: 0.28 }) // a beat of black before the words appear
+    }
+
+    // Safety net only: if progress stalls for STALL_MS (assets cached before this
+    // listener attached, a silent texture failure, or a load that never completes),
+    // finish anyway. Re-armed on every real step, so it never fires mid-load.
+    const armFallback = () => {
+      clearTimeout(stallTimer)
+      stallTimer = setTimeout(finish, STALL_MS)
+    }
+
+    manager.onProgress = (_url, loaded, total) => {
+      if (startedRef.current) return // ignore any late callbacks once finishing
+      const pct = total > 0 ? Math.min(100, Math.max(0, (loaded / total) * 100)) : 0
+      setProgress(pct)
+      armFallback()
+    }
+    manager.onLoad = finish
+
+    armFallback()
+
+    return () => {
+      clearTimeout(stallTimer)
+      timelineRef.current?.kill()
+      // Detach so a queued callback can't fire into an unmounted tree.
+      manager.onProgress = () => {}
+      manager.onLoad = () => {}
+    }
+  }, [])
 
   // Viewport size — drives the transform math; updates on resize.
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight })
@@ -116,11 +185,26 @@ export default function App() {
         <LocationWorld />
       </LayoutGroup>
 
-      {/* ── Per-mode overlays ─────────────────────────────────────────────
-          Globe   : SearchBar (+ Surprise Me)
-          Flying  : Breadcrumb, SearchBar hidden
-          Location: SearchBar (kept as-is until the header redesign) */}
-      {layoutState !== 'flying' && <SearchBar />}
+      {/* Application UI — always mounted so it never remounts or jumps. It stays
+          invisible and inert until the opening experience finishes, then fades in
+          as one. The globe (above) stays visible throughout. */}
+      <motion.div
+        initial={false}
+        animate={{ opacity: phase === 'ready' ? 1 : 0 }}
+        transition={{ duration: 0.6 }}
+        style={{
+          // Sit above the globe (z-index 1) so the overlays are not painted
+          // behind the opaque canvas; the loading/cinematic layers stay above this.
+          position: 'relative',
+          zIndex: 5,
+          pointerEvents: phase === 'ready' ? 'auto' : 'none',
+        }}
+      >
+        {/* ── Per-mode overlays ─────────────────────────────────────────────
+            Globe   : SearchBar (+ Surprise Me)
+            Flying  : Breadcrumb, SearchBar hidden
+            Location: SearchBar (kept as-is until the header redesign) */}
+        {layoutState !== 'flying' && <SearchBar />}
       {layoutState !== 'globe' && <Breadcrumb />}
       {/* Surprise Me — Globe Mode only. */}
       {layoutState === 'globe' && <SurpriseMe />}
@@ -175,12 +259,33 @@ export default function App() {
         </>
       )}
 
-      {/* Bucket List panel shell — always mounted; self-gates via AnimatePresence. */}
-      <BucketPanel />
+        {/* Bucket List panel shell — always mounted; self-gates via AnimatePresence. */}
+        <BucketPanel />
 
-      {/* Persistent UI widgets. Each self-gates and owns its own positioning. */}
-      <ZoomIndicator />
-      <MuteToggle />
+        {/* Persistent UI widgets. Each self-gates and owns its own positioning. */}
+        <ZoomIndicator />
+        <MuteToggle />
+      </motion.div>
+
+      {/* Swallow all pointer input over the globe while the opening plays, so it
+          cannot be dragged, zoomed or clicked. The globe keeps auto-rotating on
+          its own; this sits below the loading/cinematic visuals and above the
+          globe, and is removed once ready. */}
+      {phase !== 'ready' && (
+        <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'transparent' }} />
+      )}
+
+      {/* Opening experience overlays — rendered above the globe and the (hidden)
+          application UI, driven by a single phase. */}
+      {phase === 'loading' && (
+        <LoadingScreen
+          progress={progress}
+          overlayRef={overlayRef}
+          wordmarkRef={wordmarkRef}
+          progressRef={progressRef}
+        />
+      )}
+      {phase === 'cinematic' && <CinematicIntro onComplete={() => setPhase('ready')} />}
     </div>
   )
 }

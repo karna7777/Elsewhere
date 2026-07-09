@@ -3,18 +3,26 @@ import { useFrame, useThree } from '@react-three/fiber'
 import gsap from 'gsap'
 import useStore from '../store/useStore'
 import { flightCameraPosition, useFlyTo } from '../hooks/useFlyTo'
-import { DEFAULT_LEVEL, LEVEL_ALTITUDE, LEVEL_DURATION } from '../constants'
+import { DEFAULT_LEVEL, LEVEL_ALTITUDE, LEVEL_DURATION, PLACE_TYPE_FRAMING } from '../constants'
 
 function sameDestination(a, b) {
   if (!a || !b) return a === b
   return a.lat === b.lat && a.lng === b.lng && a.name === b.name
 }
 
-// Type → camera framing, read from the single source of truth (constants.js).
-// Type NEVER changes which UI renders; it only tunes the existing flyTo
-// (altitude = final camera z, duration = seconds). Unknown/missing types fall
-// back to DEFAULT_LEVEL ('city' = 1.5 / 2.8), preserving the main arrival feel.
-function cameraForType(type) {
+// Destination → camera framing, read from the single source of truth
+// (constants.js). Framing NEVER changes which UI renders; it only tunes the
+// existing flyTo (altitude = final camera z, duration = seconds).
+//
+// A searched place carries its raw geocoder type as `placeType`, which frames
+// natural features (mountain, island, beach…) more expressively than the six
+// canonical levels can. Curated nodes have no placeType and fall through to the
+// existing level-based framing — unchanged. Unknown/missing types fall back to
+// DEFAULT_LEVEL ('city' = 1.5 / 2.8), preserving the main arrival feel.
+function cameraForType(destination) {
+  const geo = destination?.placeType ? PLACE_TYPE_FRAMING[destination.placeType] : null
+  if (geo) return geo
+  const type = destination?.type
   return {
     altitude: LEVEL_ALTITUDE[type] ?? LEVEL_ALTITUDE[DEFAULT_LEVEL],
     duration: LEVEL_DURATION[type] ?? LEVEL_DURATION[DEFAULT_LEVEL],
@@ -60,7 +68,7 @@ export default function CameraRig() {
         }
         prevDestination.current = destination
         // Reuse the EXISTING flyTo pipeline — only altitude + duration vary by type.
-        const { altitude, duration } = cameraForType(destination.type)
+        const { altitude, duration } = cameraForType(destination)
         flyTo(destination.lat, destination.lng, altitude, duration)
       }
     )

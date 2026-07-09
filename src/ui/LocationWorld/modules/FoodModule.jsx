@@ -11,17 +11,18 @@ const DRINK_WORDS = ['tea', 'coffee', 'chai', 'drink', 'beverage', 'juice', 'win
 const DRINK_RE = new RegExp(`\\b(${DRINK_WORDS.join('|')})\\b`, 'i')
 
 const FOOD_STYLES = `
-  .food-module { max-width: 900px; margin: 0 auto; padding: 40px 48px 64px; }
-  @media (max-width: 560px) { .food-module { padding: 32px 20px 56px; } }
+  .food-module { max-width: var(--content-max, 1280px); margin: 0 auto; padding: 56px 48px 96px; }
+  @media (max-width: 560px) { .food-module { padding: 34px 20px 64px; } }
 
   .food-intro {
-    margin: 0; font-style: italic; font-size: 17px; font-weight: 300;
-    line-height: 1.7; color: rgba(255,255,255,0.78); max-width: 680px;
+    margin: 0; font-style: italic; font-size: 23px; font-weight: 300;
+    line-height: 1.65; color: rgba(255,255,255,0.82); max-width: 780px;
+    font-family: var(--font-display);
   }
-  .food-title { margin: 0 0 4px; font-size: 22px; font-weight: 600; color: #fff; }
-  .food-sub { margin: 0 0 12px; font-size: 13px; color: rgba(255,255,255,0.5); }
+  .food-title { margin: 0 0 6px; font-weight: 600; color: #fff; }
+  .food-sub { margin: 0 0 20px; font-size: var(--fs-meta); color: rgba(255,255,255,0.55); }
 
-  .food-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 12px; }
+  .food-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 26px; margin-top: 16px; }
   @media (max-width: 560px) { .food-grid { grid-template-columns: 1fr; } }
 `
 
@@ -121,7 +122,7 @@ function FoodModule({ location }) {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: EASE, delay: gi * 0.05 }}
-          style={{ marginTop: intro || gi > 0 ? 40 : 24 }}
+          style={{ marginTop: intro || gi > 0 ? 72 : 32 }}
         >
           <h3 className="food-title">{group.title}</h3>
 

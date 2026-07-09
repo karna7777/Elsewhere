@@ -85,4 +85,29 @@ export function useWeather(lat, lng) {
   return state
 }
 
+// Warm the shared weather cache for a coordinate ahead of render, and return the
+// normalized reading plus the location's UTC offset (seconds). Reuses the exact
+// cache + key the hook reads, so a WeatherBadge mounting at these coordinates
+// resolves instantly with no refetch. Returns null on any failure.
+export async function prefetchWeather(lat, lng) {
+  if (lat == null || lng == null) return null
+
+  const apiKey = import.meta.env.VITE_OPENWEATHER_KEY
+  if (!apiKey || apiKey === 'your_key') return null
+
+  const key = `${lat.toFixed(3)},${lng.toFixed(3)}`
+  try {
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${apiKey}`
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const weather = normalize(data)
+    resolved.set(key, weather)
+    return { weather, timezone: data.timezone ?? null }
+  } catch {
+    return null
+  }
+}
+
 export default useWeather

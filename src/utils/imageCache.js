@@ -34,6 +34,24 @@ export async function fetchPexelsImage(query, count = 1) {
   return url;
 }
 
+// Like fetchPexelsImage, but also returns the photographer credit. Warms
+// fetchPexelsImage's cache for the same query so a subsequent hero render that
+// only needs the URL is an instant cache hit (no second request, no flash).
+export async function fetchPexelsPhoto(query) {
+  const cacheKey = `${query}::photo`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const photos = await searchPexels(query, 1);
+  const p = photos?.[0];
+  const url = p?.src?.large2x ?? p?.src?.large ?? null;
+  if (!url) return null;
+
+  const photo = { url, photographer: p?.photographer ?? null };
+  cache.set(cacheKey, photo);
+  cache.set(`${query}::1`, url); // warm fetchPexelsImage(query)
+  return photo;
+}
+
 export async function fetchPexelsImages(query, count = 5) {
   const cacheKey = `${query}::multi::${count}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey);

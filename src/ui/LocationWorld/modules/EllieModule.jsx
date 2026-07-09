@@ -1092,7 +1092,7 @@ function EllieModule({ activeLocation }) {
   }, [activeLocation, setEllieMode, setEllieConversationTopic])
 
   const sendToEllie = useCallback(
-    async (raw) => {
+    async (raw, options = {}) => {
       const prompt = String(raw ?? '').trim()
       if (!prompt) return
 
@@ -1112,9 +1112,14 @@ function EllieModule({ activeLocation }) {
       const store = useStore.getState()
       // Learn preferences from THIS message before any search / context building.
       updatePreferences(prompt)
-      const mode = determineEllieMode(activeLocation, prompt, store.ellieMode)
-      setEllieMode(mode)
-      const topic = detectTopic(prompt, mode, store.ellieConversationTopic)
+      // Resolve the location and mode this send should use. Callers (e.g. a Surprise
+      // Me arrival) may override either; otherwise fall back to the live values, so
+      // ordinary sends behave exactly as before.
+      const effectiveLocation = options.overrideLocation ?? activeLocation
+      const effectiveMode =
+        options.overrideMode ?? determineEllieMode(activeLocation, prompt, store.ellieMode)
+      setEllieMode(effectiveMode)
+      const topic = detectTopic(prompt, effectiveMode, store.ellieConversationTopic)
       // Comparison intent takes precedence and bypasses recommendation/explorer/
       // general search. The engine resolves both destinations from WORLD; if two
       // don't resolve, we fall back to normal conversation (never hallucinate).
@@ -1148,10 +1153,10 @@ function EllieModule({ activeLocation }) {
       let recommendations = null
       let earlyMessage = null
       if (!comparison) {
-        if (mode === 'planner' && !activeLocation) earlyMessage = PLANNER_SPARSE
-        if (mode === 'explorer') {
+        if (effectiveMode === 'planner' && !effectiveLocation) earlyMessage = PLANNER_SPARSE
+        if (effectiveMode === 'explorer') {
           // The recommendation engine selects destinations; Groq only explains one.
-          recommendations = buildRecommendations(activeLocation, store.visitedHistory)
+          recommendations = buildRecommendations(effectiveLocation, store.visitedHistory)
           if (!recommendations.length) earlyMessage = EXPLORER_NONE
         }
       }
@@ -1167,10 +1172,14 @@ function EllieModule({ activeLocation }) {
       // (message + preferences) so Groq only reasons over real supplied destinations.
       // Gated on signal — a vague/greeting message stays an ungrounded, natural chat.
       let worldContext = null
-      if (!comparison && mode !== 'explorer' && (mode === 'discovery' || !activeLocation)) {
+      if (
+        !comparison &&
+        effectiveMode !== 'explorer' &&
+        (effectiveMode === 'discovery' || !effectiveLocation)
+      ) {
         const worldQuery = `${prompt} ${preferenceQuery()}`.trim()
         const hits = semanticSearch(worldQuery, {
-          currentId: activeLocation?.id,
+          currentId: effectiveLocation?.id,
           excludeVisited: false,
           visitedIds: store.visitedHistory,
           limit: 5,
@@ -1181,8 +1190,8 @@ function EllieModule({ activeLocation }) {
       // Unified, deterministic prompt assembly — the engine has already decided
       // what to say; Groq only writes it.
       const system = buildGroqContext({
-        mode,
-        currentLocation: activeLocation,
+        mode: effectiveMode,
+        currentLocation: effectiveLocation,
         path,
         topic,
         userMessage: prompt,
@@ -1290,6 +1299,42 @@ function EllieModule({ activeLocation }) {
     ]
   )
 
+  // Arriving somewhere via Surprise Me: greet the traveller automatically, as if a
+  // local guide were already waiting. The Surprise Me system fires this only after
+  // its flight has fully completed. The event contract supplies the destination
+  // name (with a forward-compatible `detail.location` object also supported); we
+  // resolve it to the canonical destination so Ellie speaks from real data, never
+  // invented details.
+  useEffect(() => {
+    const handleSurpriseArrival = (event) => {
+      const supplied = event.detail?.location ?? event.detail
+      if (!supplied?.name) return
+      const location = resolveNode(supplied.name) ?? supplied
+
+      setEllieMode('explorer')
+
+      const place = location.country
+        ? `${location.name}, ${location.country}`
+        : location.name
+      const surprisePrompt =
+        `I just unexpectedly arrived in ${place}. ` +
+        `Welcome me like an experienced local guide. ` +
+        `Tell me the single most fascinating thing about this place. ` +
+        `Make me excited that I ended up here. ` +
+        `Do not use greetings or introductions. ` +
+        `Maximum two short paragraphs.`
+
+      sendToEllie(surprisePrompt, {
+        overrideMode: 'explorer',
+        overrideLocation: location,
+      })
+    }
+
+    window.addEventListener('ellie:surprise-arrival', handleSurpriseArrival)
+    return () => window.removeEventListener('ellie:surprise-arrival', handleSurpriseArrival)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleSubmit = useCallback(
     (e) => {
       e.preventDefault()
@@ -1304,17 +1349,17 @@ function EllieModule({ activeLocation }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: EASE }}
       style={{
-        minHeight: '70vh',
-        maxWidth: 900,
+        minHeight: '74vh',
+        maxWidth: 1040,
         margin: '0 auto',
-        padding: '40px 48px 32px',
+        padding: '64px 56px 40px',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
       <style>{`.ellie-input::placeholder { color: rgba(255,255,255,0.4); } .ellie-input { caret-color: #7dd3fc; }`}</style>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 28, paddingBottom: 24 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 36, paddingBottom: 32 }}>
         {started ? (
           <EllieDisplay />
         ) : (
@@ -1322,10 +1367,12 @@ function EllieModule({ activeLocation }) {
             <p
               style={{
                 margin: 0,
-                fontSize: 'clamp(18px, 2.4vw, 26px)',
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(28px, 3.4vw, 46px)',
                 fontWeight: 300,
-                lineHeight: 1.5,
-                color: 'rgba(255,255,255,0.82)',
+                lineHeight: 1.35,
+                letterSpacing: '-0.01em',
+                color: 'rgba(255,255,255,0.9)',
                 whiteSpace: 'pre-line',
               }}
             >
@@ -1341,13 +1388,14 @@ function EllieModule({ activeLocation }) {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
-          background: 'rgba(255,255,255,0.05)',
+          gap: 16,
+          background: 'rgba(255,255,255,0.055)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 16,
-          padding: 18,
+          border: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: 22,
+          padding: '20px 24px',
+          boxShadow: '0 24px 60px -34px rgba(0,0,0,0.8)',
         }}
       >
         <input
@@ -1375,7 +1423,7 @@ function EllieModule({ activeLocation }) {
             border: 'none',
             outline: 'none',
             color: 'white',
-            fontSize: 15,
+            fontSize: 18,
           }}
         />
         <button
@@ -1384,13 +1432,13 @@ function EllieModule({ activeLocation }) {
           disabled={!canSend}
           style={{
             flexShrink: 0,
-            width: 38,
-            height: 38,
+            width: 48,
+            height: 48,
             borderRadius: '50%',
             border: 'none',
             background: 'rgba(125,211,252,0.15)',
             color: '#7dd3fc',
-            fontSize: 18,
+            fontSize: 22,
             lineHeight: 1,
             opacity: canSend ? 1 : 0.35,
             cursor: canSend ? 'pointer' : 'default',

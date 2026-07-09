@@ -10,7 +10,7 @@ const EASE = [0.16, 1, 0.3, 1]
 // Type-agnostic hero. Renders whatever location node is passed in (country,
 // city, landmark, hidden gem, trail…). Pure: it reads no global state — scroll
 // position and hierarchy are passed down from LocationWorld.
-function HeroSection({ location, hierarchy = [], scrollY = 0, onImageSelect }) {
+function HeroSection({ location, hierarchy = [], scrollY = 0, onOpenImage }) {
   const [imgUrl, setImgUrl] = useState(null)
   const [loaded, setLoaded] = useState(false)
 
@@ -24,16 +24,25 @@ function HeroSection({ location, hierarchy = [], scrollY = 0, onImageSelect }) {
     return () => {
       alive = false
     }
+    // Re-run only when the place changes (id), not on every heroMedia identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location?.id])
 
   if (!location) return null
+
+  // The viewer shows the hero photo first, then the whole visual journey. Thumb i
+  // maps to viewer index i + heroOffset so the ordering stays consistent.
+  const heroItem = imgUrl ? { url: imgUrl, title: location.name } : null
+  const galleryItems = location.visualJourney ?? []
+  const viewerItems = heroItem ? [heroItem, ...galleryItems] : galleryItems
+  const heroOffset = heroItem ? 1 : 0
 
   return (
     <section
       style={{
         position: 'relative',
         width: '100%',
-        minHeight: '62vh',
+        minHeight: '74vh',
         overflow: 'hidden',
       }}
     >
@@ -46,6 +55,13 @@ function HeroSection({ location, hierarchy = [], scrollY = 0, onImageSelect }) {
           src={imgUrl}
           alt=""
           onLoad={() => setLoaded(true)}
+          onClick={() => onOpenImage?.(viewerItems, 0)}
+          // If the URL ever fails, drop the image entirely so the gradient shows
+          // through — never a broken image, never a white flash.
+          onError={() => {
+            setImgUrl(null)
+            setLoaded(false)
+          }}
           style={{
             position: 'absolute',
             left: 0,
@@ -57,15 +73,17 @@ function HeroSection({ location, hierarchy = [], scrollY = 0, onImageSelect }) {
             opacity: loaded ? 1 : 0,
             transition: 'opacity 600ms ease',
             willChange: 'transform',
+            cursor: 'zoom-in',
           }}
         />
       )}
 
-      {/* overlay */}
+      {/* overlay — non-interactive so clicks fall through to the hero image */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
+          pointerEvents: 'none',
           background:
             'linear-gradient(to bottom, transparent 0%, transparent 35%, rgba(4,8,18,0.55) 55%, rgba(4,8,18,0.97) 100%)',
         }}
@@ -78,10 +96,16 @@ function HeroSection({ location, hierarchy = [], scrollY = 0, onImageSelect }) {
           left: 0,
           right: 0,
           bottom: 0,
-          padding: 32,
+          // Centered on the same 1100px column as the nav + module content, so the
+          // title, tabs and body copy all share one left edge.
+          maxWidth: 'var(--content-max, 1280px)',
+          width: '100%',
+          margin: '0 auto',
+          boxSizing: 'border-box',
+          padding: '56px 48px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 14,
+          gap: 20,
         }}
       >
         <motion.p
@@ -90,11 +114,13 @@ function HeroSection({ location, hierarchy = [], scrollY = 0, onImageSelect }) {
           transition={{ duration: 0.7, delay: 0.3, ease: EASE }}
           style={{
             margin: 0,
-            fontWeight: 300,
-            fontSize: 'clamp(18px, 2.2vw, 28px)',
-            lineHeight: 1.4,
-            maxWidth: 600,
-            color: 'rgba(255,255,255,0.92)',
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontWeight: 400,
+            fontSize: 'clamp(24px, 3vw, 42px)',
+            lineHeight: 1.35,
+            maxWidth: 760,
+            color: 'rgba(255,255,255,0.94)',
           }}
         >
           {location.heroQuote}
@@ -107,8 +133,9 @@ function HeroSection({ location, hierarchy = [], scrollY = 0, onImageSelect }) {
           style={{
             margin: 0,
             fontWeight: 300,
-            fontSize: 'clamp(36px, 4.4vw, 56px)',
-            lineHeight: 1.05,
+            fontSize: 'clamp(56px, 6.8vw, 108px)',
+            lineHeight: 0.98,
+            letterSpacing: '-0.025em',
             color: 'white',
           }}
         >
@@ -123,11 +150,11 @@ function HeroSection({ location, hierarchy = [], scrollY = 0, onImageSelect }) {
             style={{
               display: 'flex',
               flexWrap: 'wrap',
-              gap: 8,
-              fontSize: 11,
+              gap: 10,
+              fontSize: 13,
               textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: 'rgba(255,255,255,0.45)',
+              letterSpacing: '0.08em',
+              color: 'rgba(255,255,255,0.5)',
             }}
           >
             {hierarchy.map((seg, i) => (
@@ -154,7 +181,10 @@ function HeroSection({ location, hierarchy = [], scrollY = 0, onImageSelect }) {
           transition={{ duration: 0.7, delay: 0.95, ease: EASE }}
           style={{ marginTop: 6 }}
         >
-          <VisualJourney images={location.visualJourney} onSelect={onImageSelect} />
+          <VisualJourney
+            images={galleryItems}
+            onSelect={(_item, i) => onOpenImage?.(viewerItems, i + heroOffset)}
+          />
         </motion.div>
       </div>
     </section>

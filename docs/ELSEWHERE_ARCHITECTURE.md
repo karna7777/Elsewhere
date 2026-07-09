@@ -1,4 +1,4 @@
-# ELSEWHERE — Developer Handbook 
+<!-- # ELSEWHERE — Developer Handbook 
 > Read this before making any changes to the project.
 > This is the single source of truth for Elsewhere.
  
@@ -539,7 +539,7 @@ Coding Rules
 ❌ No hardcoded image URLs
 ❌ No layout property animations — GPU transforms only
 ❌ No multiple scroll listeners in same container
-❌ No "dataset" thinking — think "Knowledge Object"
+❌ No "dataset" thinking — think "Knowledge Object" -->
 
 
 

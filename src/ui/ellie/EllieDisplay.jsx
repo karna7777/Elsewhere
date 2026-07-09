@@ -59,11 +59,11 @@ function EllieDisplay() {
 
   if (thinking && !text) {
     return (
-      <div style={{ maxWidth: 680 }}>
+      <div style={{ maxWidth: 780 }}>
         <p
           style={{
             margin: 0,
-            fontSize: 14,
+            fontSize: 16,
             fontStyle: 'italic',
             color: 'rgba(255,255,255,0.55)',
           }}
@@ -78,14 +78,14 @@ function EllieDisplay() {
   if (!text) return null
 
   return (
-    <div style={{ maxWidth: 680 }}>
+    <div style={{ maxWidth: 780 }}>
       <p
         style={{
           margin: 0,
-          fontSize: 'clamp(16px, 2vw, 22px)',
+          fontSize: 'clamp(19px, 2.2vw, 27px)',
           fontWeight: 300,
-          lineHeight: 1.85,
-          color: 'rgba(255,255,255,0.88)',
+          lineHeight: 1.75,
+          color: 'rgba(255,255,255,0.9)',
           whiteSpace: 'pre-wrap',
         }}
       >
@@ -93,10 +93,10 @@ function EllieDisplay() {
       </p>
       <p
         style={{
-          margin: '12px 0 0',
-          fontSize: 11,
+          margin: '18px 0 0',
+          fontSize: 13,
           letterSpacing: '0.1em',
-          color: 'rgba(125,211,252,0.6)',
+          color: 'rgba(125,211,252,0.65)',
         }}
       >
         Ellie ✦

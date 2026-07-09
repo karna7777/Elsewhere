@@ -6,7 +6,6 @@ import { Perf } from 'r3f-perf'
 import { Leva } from 'leva'
 import { Quaternion } from 'three'
 import Earth from './Earth'
-import Stars from './Stars'
 import DayNight from './DayNight'
 import AtmosphereShader from './AtmosphereShader'
 import Clouds from './Clouds'
@@ -48,7 +47,6 @@ export default function EarthScene() {
         <color attach="background" args={['#000000']} />
         <PerspectiveCamera makeDefault position={[0, 0, 2.8]} fov={45} />
         <CameraRig />
-        <Stars />
         <DayNight>
           <Earth />
           <Clouds />

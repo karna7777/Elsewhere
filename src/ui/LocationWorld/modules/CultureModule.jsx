@@ -35,44 +35,55 @@ function traditionIcon(name) {
 }
 
 const CULTURE_STYLES = `
-  .culture-module { max-width: 900px; margin: 0 auto; padding: 40px 48px 64px; display: flex; flex-direction: column; gap: 48px; }
-  @media (max-width: 900px) { .culture-module { padding: 32px 24px 56px; } }
-  @media (max-width: 560px) { .culture-module { padding: 28px 16px 48px; gap: 40px; } }
+  .culture-module { max-width: var(--content-max, 1280px); margin: 0 auto; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: var(--space-section, 100px); }
+  @media (max-width: 900px) { .culture-module { padding: 40px 28px 72px; } }
+  @media (max-width: 560px) { .culture-module { padding: 32px 20px 60px; } }
 
-  .culture-title { margin: 0 0 20px; font-size: 22px; font-weight: 600; color: #fff; }
-  .culture-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  /* Section heading — the display serif + size come from the panel token; here we
+     set rhythm and an optional caption line beneath it. */
+  .culture-title { margin: 0 0 8px; font-weight: 600; color: #fff; }
+  .culture-caption { margin: 0 0 28px; font-size: var(--fs-body); line-height: 1.5; color: rgba(255,255,255,0.55); }
+
+  .culture-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
   @media (max-width: 560px) { .culture-grid-2 { grid-template-columns: 1fr; } }
 
+  .culture-subhead { margin: 0 0 16px; font-size: var(--fs-meta); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+
   .culture-table { width: 100%; border-collapse: collapse; }
-  .culture-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.4); padding: 8px 12px; }
-  .culture-table td { padding: 10px 12px; font-size: 13px; color: rgba(255,255,255,0.8); vertical-align: middle; }
+  .culture-table th { text-align: left; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.45); padding: 12px 16px; }
+  .culture-table td { padding: 16px 16px; font-size: var(--fs-body); line-height: 1.5; color: rgba(255,255,255,0.85); vertical-align: middle; }
 `
 
-function SectionTitle({ children }) {
-  return <h3 className="culture-title">{children}</h3>
+function SectionTitle({ children, caption }) {
+  return (
+    <>
+      <h3 className="culture-title">{children}</h3>
+      {caption && <p className="culture-caption">{caption}</p>}
+    </>
+  )
 }
 
 // ── Etiquette chip lists ─────────────────────────────────────────────────────
 function EtiquetteList({ items, mark, color, bg }) {
   if (!items?.length) return null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {items.map((item, i) => (
         <span
           key={`${item}-${i}`}
           style={{
             display: 'flex',
-            gap: 8,
-            fontSize: 13,
-            lineHeight: 1.5,
-            padding: '10px 14px',
-            borderRadius: 10,
+            gap: 14,
+            fontSize: 'var(--fs-body)',
+            lineHeight: 1.6,
+            padding: '17px 22px',
+            borderRadius: 14,
             background: bg,
             border: `1px solid ${color}33`,
-            color: 'rgba(255,255,255,0.82)',
+            color: 'rgba(255,255,255,0.88)',
           }}
         >
-          <span style={{ color, flexShrink: 0 }}>{mark}</span>
+          <span style={{ color, flexShrink: 0, fontSize: 19, lineHeight: 1.45 }}>{mark}</span>
           <span>{item}</span>
         </span>
       ))}
@@ -126,7 +137,7 @@ function CultureModule({ location }) {
   if (!culture) {
     return (
       <div className="culture-module" style={{ textAlign: 'center' }}>
-        <p style={{ margin: 0, fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>
+        <p style={{ margin: 0, fontSize: 15, color: 'rgba(255,255,255,0.4)' }}>
           Cultural information coming soon.
         </p>
       </div>
@@ -151,7 +162,7 @@ function CultureModule({ location }) {
       {/* 1 — HISTORY TIMELINE */}
       {history.length > 0 && (
         <section>
-          <SectionTitle>History</SectionTitle>
+          <SectionTitle caption="Key moments that shaped this place.">History</SectionTitle>
           <div style={{ position: 'relative', paddingLeft: 22 }}>
             <span
               aria-hidden="true"
@@ -179,9 +190,11 @@ function CultureModule({ location }) {
                     }}
                   />
                   {ev.year != null && (
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#7dd3fc' }}>{ev.year}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.02em', color: '#7dd3fc', marginBottom: 3 }}>
+                      {ev.year}
+                    </div>
                   )}
-                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 'var(--fs-body)', color: 'rgba(255,255,255,0.85)', lineHeight: 1.65 }}>
                     {ev.description ?? ev.event ?? ev.text}
                   </div>
                 </motion.div>
@@ -194,28 +207,28 @@ function CultureModule({ location }) {
       {/* 2 — TRADITIONS */}
       {traditions.length > 0 && (
         <section>
-          <SectionTitle>Traditions</SectionTitle>
+          <SectionTitle caption="Living customs you'll encounter here.">Traditions</SectionTitle>
           <div className="culture-grid-2">
             {traditions.map((t, i) => (
               <motion.div
                 key={t.name ?? i}
                 whileHover={{ scale: 1.02, transition: { duration: 0.2, ease: EASE } }}
                 style={{
-                  padding: '16px 18px',
-                  borderRadius: 12,
+                  padding: '28px 30px',
+                  borderRadius: 18,
                   background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.08)',
                 }}
               >
-                <div style={{ fontSize: 22, marginBottom: 6 }}>{traditionIcon(t.name)}</div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>{t.name}</div>
+                <div style={{ fontSize: 40, marginBottom: 14 }}>{traditionIcon(t.name)}</div>
+                <div style={{ fontSize: 'var(--fs-card)', fontWeight: 600, color: '#fff' }}>{t.name}</div>
                 {t.description && (
                   <div
                     style={{
-                      marginTop: 4,
-                      fontSize: 13,
-                      color: 'rgba(255,255,255,0.6)',
-                      lineHeight: 1.5,
+                      marginTop: 8,
+                      fontSize: 'var(--fs-body)',
+                      color: 'rgba(255,255,255,0.68)',
+                      lineHeight: 1.6,
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
@@ -234,7 +247,7 @@ function CultureModule({ location }) {
       {/* 3 — FESTIVALS */}
       {festivals.length > 0 && (
         <section>
-          <SectionTitle>Festivals</SectionTitle>
+          <SectionTitle caption="Time your visit around the year's celebrations.">Festivals</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {festivals.map((f, i) => {
               const color = seasonColor(f._mi)
@@ -244,35 +257,37 @@ function CultureModule({ location }) {
                 <div
                   key={f.name ?? i}
                   style={{
-                    padding: '16px 18px',
-                    borderRadius: 12,
+                    padding: '28px 30px',
+                    borderRadius: 18,
                     background: 'rgba(255,255,255,0.04)',
                     border: '1px solid rgba(255,255,255,0.08)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                     <span
                       style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: '3px 10px',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        letterSpacing: '0.03em',
+                        padding: '5px 14px',
                         borderRadius: 999,
                         background: `${color}22`,
                         color,
                         border: `1px solid ${color}55`,
+                        flexShrink: 0,
                       }}
                     >
                       {chip}
                     </span>
-                    <span style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>{f.name}</span>
+                    <span style={{ fontSize: 'var(--fs-card)', fontWeight: 600, color: '#fff' }}>{f.name}</span>
                   </div>
                   {f.description && (
-                    <p style={{ margin: '8px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+                    <p style={{ margin: '12px 0 0', fontSize: 'var(--fs-body)', color: 'rgba(255,255,255,0.78)', lineHeight: 1.65 }}>
                       {f.description}
                     </p>
                   )}
                   {crowdTip && (
-                    <p style={{ margin: '6px 0 0', fontSize: 12, fontStyle: 'italic', color: 'rgba(255,255,255,0.55)' }}>
+                    <p style={{ margin: '10px 0 0', fontSize: 'var(--fs-meta)', fontStyle: 'italic', color: 'rgba(255,255,255,0.55)' }}>
                       {crowdTip}
                     </p>
                   )}
@@ -286,18 +301,18 @@ function CultureModule({ location }) {
       {/* 4 — ETIQUETTE */}
       {(hasDoDont || flatEtiquette?.length) && (
         <section>
-          <SectionTitle>Etiquette</SectionTitle>
+          <SectionTitle caption="Small courtesies that go a long way with locals.">Etiquette</SectionTitle>
           {hasDoDont ? (
             <div className="culture-grid-2">
               {doList?.length > 0 && (
                 <div>
-                  <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: '#10b981' }}>Do</h4>
+                  <h4 className="culture-subhead" style={{ color: '#10b981' }}>Do</h4>
                   <EtiquetteList items={doList} mark="✓" color="#10b981" bg="rgba(16,185,129,0.10)" />
                 </div>
               )}
               {dontList?.length > 0 && (
                 <div>
-                  <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: '#ef4444' }}>Don't</h4>
+                  <h4 className="culture-subhead" style={{ color: '#ef4444' }}>Don't</h4>
                   <EtiquetteList items={dontList} mark="✗" color="#ef4444" bg="rgba(239,68,68,0.10)" />
                 </div>
               )}
@@ -311,21 +326,21 @@ function CultureModule({ location }) {
       {/* 5 — DRESS CODE */}
       {dress && (dress.wear?.length || dress.avoid?.length) && (
         <section>
-          <SectionTitle>Dress Code</SectionTitle>
+          <SectionTitle caption="What to pack so you blend in, not stand out.">Dress Code</SectionTitle>
           <div className="culture-grid-2">
             {dress.wear?.length > 0 && (
-              <div style={{ padding: '16px 18px', borderRadius: 12, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
-                <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#10b981' }}>Wear</h4>
+              <div style={{ padding: '26px 30px', borderRadius: 18, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
+                <h4 className="culture-subhead" style={{ color: '#10b981' }}>Wear</h4>
                 {[].concat(dress.wear).map((w, i) => (
-                  <p key={i} style={{ margin: i ? '6px 0 0' : 0, fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>{w}</p>
+                  <p key={i} style={{ margin: i ? '10px 0 0' : 0, fontSize: 'var(--fs-body)', lineHeight: 1.55, color: 'rgba(255,255,255,0.85)' }}>{w}</p>
                 ))}
               </div>
             )}
             {dress.avoid?.length > 0 && (
-              <div style={{ padding: '16px 18px', borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: '#ef4444' }}>Avoid</h4>
+              <div style={{ padding: '26px 30px', borderRadius: 18, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                <h4 className="culture-subhead" style={{ color: '#ef4444' }}>Avoid</h4>
                 {[].concat(dress.avoid).map((a, i) => (
-                  <p key={i} style={{ margin: i ? '6px 0 0' : 0, fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>{a}</p>
+                  <p key={i} style={{ margin: i ? '10px 0 0' : 0, fontSize: 'var(--fs-body)', lineHeight: 1.55, color: 'rgba(255,255,255,0.85)' }}>{a}</p>
                 ))}
               </div>
             )}
@@ -336,7 +351,7 @@ function CultureModule({ location }) {
       {/* 6 — LANGUAGE BASICS */}
       {phrases?.length > 0 && (
         <section>
-          <SectionTitle>Language Basics</SectionTitle>
+          <SectionTitle caption="A few phrases that earn a warm smile.">Language Basics</SectionTitle>
           <table className="culture-table">
             <thead>
               <tr>

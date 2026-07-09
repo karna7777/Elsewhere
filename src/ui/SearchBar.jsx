@@ -1,18 +1,26 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import useStore from '../store/useStore'
 import destinations from '../data/destinations.js'
 import { resolveNode } from '../data/NodeResolver.js'
+import { searchWorld } from '../services/geocoder'
+import { createTemporaryLocation } from '../utils/createTemporaryLocation'
+import { enrichDestination } from '../services/enrichDestination'
+import SearchDropdown from './SearchDropdown'
 
 const MAX_RESULTS = 8
+const WORLD_DEBOUNCE_MS = 300
+const LISTBOX_ID = 'elsewhere-search-listbox'
 
-// Case-insensitive match across name/country/continent, plus a fuzzy pass over
-// wonder and hidden-gem names so a search like "torii" or "lagoon" still lands.
+// Match a curated destination only on its own name / country / continent — NOT on
+// nested wonder or hidden-gem names. Matching those made a query like "munnar"
+// resolve to curated "Kerala" (which lists Munnar as a wonder) and suppressed the
+// worldwide search, so the actual town never appeared. Now specific places fall
+// through to the geocoder and surface directly.
 function matches(dest, q) {
   if (dest.name.toLowerCase().includes(q)) return true
   if (dest.country.toLowerCase().includes(q)) return true
   if (dest.continent.toLowerCase().includes(q)) return true
-  if (dest.wonders?.some((w) => w.name.toLowerCase().includes(q))) return true
-  if (dest.hiddenGems?.some((g) => g.name.toLowerCase().includes(q))) return true
   return false
 }
 
@@ -21,43 +29,114 @@ export default function SearchBar() {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
+  // Worldwide results tagged with the query they belong to, so a stale response
+  // (or the debounce gap) is never mistaken for "no results" — avoiding an empty
+  // flash before the real results land.
+  const [world, setWorld] = useState({ q: '', results: [], done: false })
   const inputRef = useRef(null)
+  // Prevents a second selection while a worldwide result is being enriched.
+  const resolvingRef = useRef(false)
 
+  // Curated matches — always first-class, resolved synchronously from the dataset.
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return []
     return destinations.filter((d) => matches(d, q)).slice(0, MAX_RESULTS)
   }, [query])
 
-  const showDropdown = open && results.length > 0
+  // Hybrid fallback: only reach for the worldwide geocoder when curated search
+  // finds nothing. Debounced and abortable, so rapid typing cancels stale
+  // requests. ALL state changes happen inside the debounced callback (never
+  // synchronously in the effect body), and results are tagged with their query.
+  useEffect(() => {
+    const q = query.trim()
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      if (!q || results.length > 0) {
+        setWorld({ q, results: [], done: true })
+        return
+      }
+      const found = await searchWorld(q, { signal: controller.signal })
+      if (controller.signal.aborted) return
+      setWorld({ q, results: found, done: true })
+    }, WORLD_DEBOUNCE_MS)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [query, results.length])
 
-  const select = (dest) => {
-    if (!dest) return
-    // Resolve to a normalized LocationNode first (sync, pure), then enter — the
-    // store stays free of resolution logic. Triggers the cinematic fly-to via the
-    // activeDestination subscription and resets the navigation stack to this root.
-    setActiveDestination(resolveNode(dest))
+  // ── Derived view state ──────────────────────────────────────────────────────
+  const qTrim = query.trim()
+  const usingWorld = results.length === 0 && qTrim.length > 0
+  const worldReady = world.done && world.q === qTrim
+  const worldResults = usingWorld && worldReady ? world.results : []
+  const items = usingWorld ? worldResults : results
+  const loading = usingWorld && !worldReady
+  const empty = usingWorld && worldReady && world.results.length === 0
+  const showDropdown = open && qTrim.length > 0
+  const clampedIndex = items.length ? Math.min(activeIndex, items.length - 1) : 0
+
+  const reset = () => {
     setQuery('')
     setOpen(false)
     setActiveIndex(0)
+    setWorld({ q: '', results: [], done: false })
     inputRef.current?.blur()
   }
+
+  // Resolve to a normalized LocationNode first (sync, pure), then enter — the store
+  // stays free of resolution logic. Triggers the cinematic fly-to via the
+  // activeDestination subscription and resets the navigation stack to this root.
+  const selectCurated = (dest) => {
+    if (!dest) return
+    setActiveDestination(resolveNode(dest))
+    reset()
+  }
+
+  // A worldwide result resolves INSTANTLY from geocoder facts (zero network), so
+  // navigation flies the moment it's selected. The factual layer (Wikipedia, hero,
+  // weather) and the AI composition both stream into the repository afterwards, in
+  // the background — the fly is never blocked.
+  const selectWorld = (result) => {
+    if (!result || resolvingRef.current) return
+    resolvingRef.current = true
+    const location = createTemporaryLocation(result)
+    resolvingRef.current = false
+    if (location) {
+      setActiveDestination(location) // fly now (facts + placeType already on it)
+      enrichDestination(location, result) // background: knowledge + AI → repository → UI
+    }
+    reset()
+  }
+
+  const chooseAt = useCallback(
+    (i) => {
+      const item = items[i]
+      if (!item) return
+      if (usingWorld) selectWorld(item)
+      else selectCurated(item)
+    },
+    // selectCurated/selectWorld are stable closures over store setter + refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, usingWorld]
+  )
+
+  const onHover = useCallback((i) => setActiveIndex(i), [])
 
   const onKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setOpen(true)
-      setActiveIndex((i) => Math.min(i + 1, results.length - 1))
+      setActiveIndex((i) => (items.length ? (i + 1) % items.length : 0))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveIndex((i) => Math.max(i - 1, 0))
+      setOpen(true)
+      setActiveIndex((i) => (items.length ? (i - 1 + items.length) % items.length : 0))
     } else if (e.key === 'Enter') {
-      if (results.length) select(results[Math.max(0, Math.min(activeIndex, results.length - 1))])
+      if (items.length) chooseAt(clampedIndex)
     } else if (e.key === 'Escape') {
-      setQuery('')
-      setOpen(false)
-      setActiveIndex(0)
-      inputRef.current?.blur()
+      reset()
     }
   }
 
@@ -110,6 +189,13 @@ export default function SearchBar() {
           ref={inputRef}
           className="elsewhere-search-input"
           type="text"
+          role="combobox"
+          aria-expanded={showDropdown}
+          aria-controls={LISTBOX_ID}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            showDropdown && items.length ? `${LISTBOX_ID}-opt-${clampedIndex}` : undefined
+          }
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -135,58 +221,23 @@ export default function SearchBar() {
         />
       </div>
 
-      {/* Autocomplete dropdown */}
-      {showDropdown && (
-        <div
-          role="listbox"
-          style={{
-            marginTop: 8,
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: 20,
-            padding: 6,
-            overflow: 'hidden',
-          }}
-        >
-          {results.map((d, i) => (
-            <div
-              key={d.id}
-              role="option"
-              aria-selected={i === activeIndex}
-              // mousedown (not click) so selection fires before the input blur closes the list
-              onMouseDown={(e) => {
-                e.preventDefault()
-                select(d)
-              }}
-              onMouseEnter={() => setActiveIndex(i)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-                padding: '12px 16px',
-                borderRadius: 14,
-                cursor: 'pointer',
-                background: i === activeIndex ? 'rgba(255,255,255,0.12)' : 'transparent',
-                transition: 'background 0.15s ease',
-              }}
-            >
-              <span style={{ fontSize: 20, flexShrink: 0 }}>{d.flag}</span>
-              <span style={{ color: 'white', fontSize: 15, fontWeight: 500 }}>{d.name}</span>
-              <span
-                style={{
-                  marginLeft: 'auto',
-                  color: 'rgba(255,255,255,0.4)',
-                  fontSize: 13,
-                }}
-              >
-                {d.country}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Autocomplete dropdown — curated matches first; worldwide results only when
+          the curated search finds nothing. */}
+      <AnimatePresence>
+        {showDropdown && (
+          <SearchDropdown
+            listboxId={LISTBOX_ID}
+            items={items}
+            curated={!usingWorld}
+            loading={loading}
+            empty={empty}
+            activeIndex={clampedIndex}
+            query={query}
+            onHover={onHover}
+            onChoose={chooseAt}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

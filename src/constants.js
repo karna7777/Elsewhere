@@ -40,3 +40,32 @@ export const LEVEL_DURATION = {
 // Fallback level when a node's type is missing/unknown — matches the curated
 // destination feel (1.5 / 2.8).
 export const DEFAULT_LEVEL = 'city'
+
+// Finer framing for worldwide search results, keyed by the raw geocoder place
+// type (which distinguishes natural features the six canonical levels can't:
+// mountains, islands, beaches…). Values are {altitude, duration} in the same
+// units as LEVEL_ALTITUDE / LEVEL_DURATION and feed the very same flyTo — this is
+// tuning, not a second camera system. The camera stays on the +Z axis (only its
+// depth changes), so "elevated"/"lower" angles are expressed as altitude: islands
+// and mountains sit higher/farther to convey scale; beaches frame lower/closer.
+// Only searched nodes carry a placeType, so curated destinations never touch this.
+export const PLACE_TYPE_FRAMING = {
+  country: { altitude: 2.2, duration: 3.0 },
+  state: { altitude: 1.8, duration: 2.8 },
+  province: { altitude: 1.8, duration: 2.8 },
+  city: { altitude: 1.5, duration: 2.8 },
+  village: { altitude: 1.45, duration: 2.6 },
+  suburb: { altitude: 1.4, duration: 2.6 },
+  island: { altitude: 1.9, duration: 3.0 }, // medium-high
+  mountain: { altitude: 1.7, duration: 2.8 }, // slightly elevated
+  lake: { altitude: 1.7, duration: 2.8 },
+  river: { altitude: 1.7, duration: 2.8 },
+  beach: { altitude: 1.35, duration: 2.4 }, // lower, closer
+  forest: { altitude: 1.6, duration: 2.6 },
+  park: { altitude: 1.55, duration: 2.6 },
+  museum: { altitude: 1.25, duration: 2.2 },
+  monument: { altitude: 1.2, duration: 2.2 }, // closest
+  landmark: { altitude: 1.2, duration: 2.2 }, // closest
+  attraction: { altitude: 1.3, duration: 2.2 },
+  airport: { altitude: 1.5, duration: 2.6 },
+}

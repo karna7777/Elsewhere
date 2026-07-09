@@ -12,23 +12,27 @@ export default function ModuleWrapper({ title, icon, children }) {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: EASE }}
-      style={{ padding: '40px 48px', maxWidth: 900, margin: '0 auto' }}
+      style={{ padding: '56px 48px', maxWidth: 'var(--content-max, 1280px)', margin: '0 auto' }}
     >
       {title && (
         <h2
+          className="lw-kicker"
           style={{
-            margin: '0 0 32px',
-            fontSize: 11,
-            fontWeight: 600,
+            margin: '0 0 30px',
+            // Inline font-family so the panel's serif-heading rule never catches
+            // these tracked caption labels.
+            fontFamily: 'var(--font-body)',
+            fontSize: 'var(--fs-eyebrow, 14px)',
+            fontWeight: 700,
             textTransform: 'uppercase',
-            letterSpacing: '0.12em',
-            color: 'rgba(255,255,255,0.3)',
+            letterSpacing: '0.16em',
+            color: 'rgba(255,255,255,0.45)',
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
+            gap: 12,
           }}
         >
-          {icon && <span style={{ fontSize: 14 }}>{icon}</span>}
+          {icon && <span style={{ fontSize: 18 }}>{icon}</span>}
           {title}
         </h2>
       )}

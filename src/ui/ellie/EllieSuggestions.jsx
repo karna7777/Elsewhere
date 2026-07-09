@@ -40,7 +40,7 @@ function guideSuggestions(name) {
 }
 
 const SUGGESTIONS_CSS = `
-  .ellie-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .ellie-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
   @media (max-width: 560px) { .ellie-grid { grid-template-columns: 1fr; } }
   .ellie-card { transition: border-color 0.2s ease, color 0.2s ease; }
   .ellie-card:hover { border-color: rgba(125,211,252,0.3); color: #fff; }
@@ -80,13 +80,14 @@ function EllieSuggestions({ activeLocation, onSelect }) {
           transition={{ duration: 0.35, ease: EASE, delay: i * 0.04 }}
           whileHover={{ scale: 1.02, transition: { duration: 0.2, ease: EASE } }}
           style={{
-            background: 'rgba(255,255,255,0.04)',
+            background: 'rgba(255,255,255,0.045)',
             border: '1px solid rgba(255,255,255,0.10)',
-            borderRadius: 14,
-            padding: '20px 24px',
-            fontSize: 15,
+            borderRadius: 18,
+            padding: '26px 30px',
+            fontSize: 18,
             fontWeight: 300,
-            color: 'rgba(255,255,255,0.75)',
+            lineHeight: 1.4,
+            color: 'rgba(255,255,255,0.78)',
             cursor: 'pointer',
           }}
         >

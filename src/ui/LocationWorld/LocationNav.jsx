@@ -3,7 +3,9 @@ import { memo } from 'react'
 // Module definitions — a tab only appears when its data exists on the node.
 // Ellie is always available. Order here is the tab order.
 const MODULE_DEFS = [
-  { key: 'story', label: 'Story', has: (l) => !!l.story },
+  // Story is present while the AI Composer is still running, so a searched place
+  // opens straight onto the (shimmering) Story tab that its real story fades into.
+  { key: 'story', label: 'Story', has: (l) => !!l.story || l.aiStatus === 'pending' },
   { key: 'explore', label: 'Explore', has: (l) => l.wonders?.length > 0 },
   { key: 'hidden', label: 'Hidden', has: (l) => l.hiddenGems?.length > 0 },
   { key: 'food', label: 'Food', has: (l) => l.food?.length > 0 },
@@ -26,16 +28,10 @@ function LocationNav({ location, scrolled, activeModule, onSelect }) {
 
   return (
     <nav
-      className="lw-noscroll"
       style={{
         position: 'sticky',
         top: 0,
         zIndex: 5,
-        display: 'flex',
-        gap: 24,
-        padding: '0 32px',
-        overflowX: 'auto',
-        overflowY: 'hidden',
         background: scrolled ? 'rgba(4,8,18,0.90)' : 'transparent',
         backdropFilter: scrolled ? 'blur(20px)' : 'none',
         WebkitBackdropFilter: scrolled ? 'blur(20px)' : 'none',
@@ -43,6 +39,20 @@ function LocationNav({ location, scrolled, activeModule, onSelect }) {
         transition: 'background 300ms ease, backdrop-filter 300ms ease, border-color 300ms ease',
       }}
     >
+      {/* Inner wrapper shares the same centered 1100px column as the module
+          content, so the tabs line up with everything below them. */}
+      <div
+        className="lw-noscroll"
+        style={{
+          maxWidth: 'var(--content-max, 1280px)',
+          margin: '0 auto',
+          padding: '0 48px',
+          display: 'flex',
+          gap: 38,
+          overflowX: 'auto',
+          overflowY: 'hidden',
+        }}
+      >
       {modules.map((m) => {
         const active = m.key === activeModule
         return (
@@ -55,10 +65,11 @@ function LocationNav({ location, scrolled, activeModule, onSelect }) {
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              padding: '16px 0',
-              fontSize: 12,
+              padding: '22px 0',
+              fontSize: 15,
+              fontWeight: 500,
               textTransform: 'uppercase',
-              letterSpacing: '0.07em',
+              letterSpacing: '0.08em',
               color: active ? '#7dd3fc' : 'rgba(255,255,255,0.4)',
               borderBottom: active ? '2px solid #7dd3fc' : '2px solid transparent',
               transition: 'color 0.2s ease',
@@ -68,6 +79,7 @@ function LocationNav({ location, scrolled, activeModule, onSelect }) {
           </button>
         )
       })}
+      </div>
     </nav>
   )
 }

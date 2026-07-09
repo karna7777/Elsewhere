@@ -15,6 +15,11 @@
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
+  /* Editorial theme — used across the location panel. Fraunces gives the
+     magazine/travel-journal display voice; Inter keeps body copy crisp. */
+  --font-body: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
   color-scheme: light dark;

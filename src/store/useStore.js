@@ -4,6 +4,7 @@ import {
   persist,
   subscribeWithSelector,
 } from 'zustand/middleware'
+import destinationRepository from '../services/destinationRepository'
 
 const EMPTY_BUCKET_LIST = {
   dream: [],
@@ -29,6 +30,19 @@ const VISITED_MAX = 10
 function buildBreadcrumb(levelHistory) {
   if (!levelHistory.length) return ['Elsewhere']
   const root = levelHistory[0]
+
+  // A searched (temporary) place has no curated continent, but it does carry its
+  // own country/state — derive the richest possible hierarchy from those real
+  // fields only (country → state → name), dropping empties and collapsing a
+  // repeated segment (a country whose name equals its country). Nothing is
+  // fabricated. Curated nodes never set isTemporary, so their breadcrumb below is
+  // completely unchanged.
+  if (root.isTemporary) {
+    const path = [root.country, root.state, ...levelHistory.map(destinationLabel)].filter(Boolean)
+    const deduped = path.filter((seg, i) => seg !== path[i - 1])
+    return ['Elsewhere', ...deduped]
+  }
+
   const context = ['Elsewhere', root.continent, root.country].filter(Boolean)
   return [...context, ...levelHistory.map(destinationLabel)]
 }
@@ -133,6 +147,26 @@ const useStore = create(
               activeTab: 'overview',
               expandedCard: null,
             }
+          }),
+
+        // Mirror a repository update into the store. The Destination Repository is
+        // the source of truth; when it patches a destination (e.g. background AI
+        // composition completes), this refreshes any store reference to that id so
+        // the UI re-renders. It never originates content — it only reflects the
+        // repository. No-ops when the id isn't the active location or in the stack.
+        syncRepositoryDestination: (id, destination) =>
+          set((state) => {
+            if (!id || !destination) return state
+            const patch = {}
+            const idx = state.levelHistory.findIndex((node) => node?.id === id)
+            if (idx !== -1) {
+              const levelHistory = state.levelHistory.slice()
+              levelHistory[idx] = destination
+              patch.levelHistory = levelHistory
+              if (idx === levelHistory.length - 1) patch.activeDestination = destination
+            }
+            if (state.activeDestination?.id === id) patch.activeDestination = destination
+            return Object.keys(patch).length ? patch : state
           }),
 
         // Jump straight to a level (breadcrumb click). Trims levelHistory to the
@@ -324,6 +358,14 @@ const useStore = create(
     )
   )
 )
+
+// Bridge: the store mirrors the Destination Repository. One-directional — the
+// store imports the repository and reflects its updates; the repository never
+// imports the store (no cycle). This is how background AI composition reaches the
+// live UI.
+destinationRepository.subscribe((id, destination) => {
+  useStore.getState().syncRepositoryDestination(id, destination)
+})
 
 export default useStore
 export { useStore }
