@@ -43,7 +43,7 @@ const SUGGESTIONS_CSS = `
   .ellie-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
   @media (max-width: 560px) { .ellie-grid { grid-template-columns: 1fr; } }
   .ellie-card { transition: border-color 0.2s ease, color 0.2s ease; }
-  .ellie-card:hover { border-color: rgba(125,211,252,0.3); color: #fff; }
+  .ellie-card:hover { border-color: rgba(232,192,122,0.3); color: #fff; }
 `
 
 // Presentational. The suggestion set follows Ellie's remembered mode (Planner/

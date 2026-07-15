@@ -28,7 +28,7 @@ const STRIP_CSS = `
     outline: none;
   }
   .ai-strip:focus-visible {
-    outline: 2px solid rgba(125,211,252,0.5);
+    outline: 2px solid rgba(232,192,122,0.5);
     outline-offset: -2px;
   }
   .ai-strip-hl {
@@ -144,7 +144,7 @@ function AIStrip({ setActiveModule, isGlobeMode }) {
           position: 'relative',
           flexShrink: 0,
           fontSize: 12,
-          color: '#7dd3fc',
+          color: '#e8c07a',
           letterSpacing: '0.02em',
         }}
       >
@@ -185,7 +185,7 @@ function AIStrip({ setActiveModule, isGlobeMode }) {
           marginLeft: 'auto',
           fontSize: 12,
           fontWeight: 300,
-          color: '#7dd3fc',
+          color: '#e8c07a',
         }}
       >
         Ask Ellie <span className="ai-strip-arrow">→</span>

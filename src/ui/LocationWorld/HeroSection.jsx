@@ -1,7 +1,6 @@
 import { memo, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { fetchPexelsImage } from '../../utils/imageCache.js'
-import WeatherBadge from './WeatherBadge'
 import VisualJourney from './VisualJourney'
 
 const GRADIENT_FALLBACK = 'linear-gradient(135deg, #08111f, #11223c, #0d3555)'
@@ -166,14 +165,41 @@ function HeroSection({ location, hierarchy = [], scrollY = 0, onOpenImage }) {
           </motion.div>
         )}
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.8, ease: EASE }}
-          style={{ marginTop: 4 }}
-        >
-          <WeatherBadge lat={location.lat} lng={location.lng} />
-        </motion.div>
+        {/* Mood tag row — the essence of the place at a glance. */}
+        {location.moods?.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.88, ease: EASE }}
+            style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6 }}
+          >
+            {location.moods.slice(0, 6).map((m) => (
+              <span
+                key={m}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '7px 15px',
+                  borderRadius: 999,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: 'rgba(255,255,255,0.9)',
+                  background: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(232,192,122,0.28)',
+                  backdropFilter: 'blur(14px)',
+                  WebkitBackdropFilter: 'blur(14px)',
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{ width: 5, height: 5, borderRadius: '50%', background: '#e8c07a', flexShrink: 0 }}
+                />
+                {m}
+              </span>
+            ))}
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 12 }}

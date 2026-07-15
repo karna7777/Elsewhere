@@ -12,7 +12,6 @@ import BucketPanel from './ui/BucketList/BucketPanel'
 import ZoomIndicator from './ui/ZoomIndicator'
 import MuteToggle from './ui/MuteToggle'
 import LoadingScreen from './ui/LoadingScreen'
-import CinematicIntro from './ui/CinematicIntro'
 import useStore from './store/useStore'
 
 // Companion column target width (matches GlobeCompanion / LocationWorld split).
@@ -91,6 +90,16 @@ export default function App() {
       manager.onLoad = () => {}
     }
   }, [])
+
+  // Safety net for the in-canvas cinematic: if the 3D intro never signals done
+  // (font/shader failure, a stalled timeline), force the app to reveal anyway so
+  // it can never be trapped behind the opening.
+  useEffect(() => {
+    if (phase !== 'cinematic') return undefined
+    const MAX_INTRO_MS = 12000
+    const t = setTimeout(() => setPhase('ready'), MAX_INTRO_MS)
+    return () => clearTimeout(t)
+  }, [phase])
 
   // Viewport size — drives the transform math; updates on resize.
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight })
@@ -175,7 +184,10 @@ export default function App() {
             zIndex: 1,
           }}
         >
-          <EarthScene />
+          <EarthScene
+            introActive={phase === 'cinematic'}
+            onIntroDone={() => setPhase('ready')}
+          />
         </motion.div>
 
         {/* Companion chrome (location mode only) */}
@@ -191,7 +203,9 @@ export default function App() {
       <motion.div
         initial={false}
         animate={{ opacity: phase === 'ready' ? 1 : 0 }}
-        transition={{ duration: 0.6 }}
+        // Gradual, eased reveal so the search + navigation settle in rather than
+        // snapping on all at once as the wordmark dissolves.
+        transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
         style={{
           // Sit above the globe (z-index 1) so the overlays are not painted
           // behind the opaque canvas; the loading/cinematic layers stay above this.
@@ -285,7 +299,6 @@ export default function App() {
           progressRef={progressRef}
         />
       )}
-      {phase === 'cinematic' && <CinematicIntro onComplete={() => setPhase('ready')} />}
     </div>
   )
 }

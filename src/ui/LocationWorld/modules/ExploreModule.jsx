@@ -1,17 +1,8 @@
-import { Fragment, memo, useMemo } from 'react'
+import { memo, useCallback } from 'react'
 import useStore from '../../../store/useStore'
 import { resolveNode } from '../../../data/NodeResolver.js'
-import ModuleWrapper from './shared/ModuleWrapper'
-import LocationCard from './shared/LocationCard'
-
-// Difficulty → label + colour. A gem only shows a badge when it carries a
-// difficulty; absent data renders no badge (never an empty pill).
-const DIFFICULTY = {
-  easy: { label: 'Easy Access', color: '#10b981' },
-  moderate: { label: 'Some Effort', color: '#f59e0b' },
-  hard: { label: 'Off the Beaten Path', color: '#f97316' },
-  remote: { label: 'True Explorer', color: '#8b5cf6' },
-}
+import Chapter from '../chapters/Chapter'
+import { EditorialSplit, Reveal } from '../chapters/editorial'
 
 // Keyword → activity icon (data carries no icon field, so derive from the name).
 const ACTIVITY_ICONS = [
@@ -35,192 +26,117 @@ function activityIcon(activity) {
   return '🧭'
 }
 
-function Badge({ color, children }) {
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '4px 10px',
-        borderRadius: 999,
-        fontSize: 10,
-        fontWeight: 600,
-        textTransform: 'uppercase',
-        letterSpacing: '0.06em',
-        color,
-        background: `${color}22`,
-        border: `1px solid ${color}55`,
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-      }}
-    >
-      {children}
-    </span>
-  )
-}
+const STYLES = `
+  .explore-flow { display: flex; flex-direction: column; gap: clamp(76px, 9vw, 128px); margin-top: clamp(40px, 5vw, 68px); }
 
-// Gradient rule, not a flat border (per spec) — placed only between sections.
-const Divider = () => (
-  <div
-    style={{
-      height: 1,
-      margin: '48px auto',
-      maxWidth: 900,
-      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)',
-    }}
-  />
-)
+  .explore-block { max-width: var(--content-max); margin: 0 auto; padding: 0 48px; width: 100%; box-sizing: border-box; }
+  @media (max-width: 560px) { .explore-block { padding: 0 20px; } }
 
-// ExploreModule — begins recursive exploration. Every card calls pushLevel,
-// which reuses the existing recursive camera system. type defaults only when
-// the node doesn't already declare one (never hardcoded). Each section is
-// data-driven and omitted entirely when empty, so the layout collapses.
+  .explore-wonders { display: flex; flex-direction: column; gap: clamp(72px, 9vw, 128px); }
+  .explore-kicker { margin: 0 0 12px; font-size: var(--fs-eyebrow); font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.16em; color: var(--gold); }
+  .explore-wonder-title { margin: 0 0 18px; font-family: var(--font-display); font-weight: 400;
+    font-size: clamp(28px, 3.4vw, 48px); line-height: 1.06; letter-spacing: -0.015em; color: #fff; }
+  .explore-prose { margin: 0 0 24px; font-size: var(--fs-body); line-height: 1.7; color: rgba(255,255,255,0.8); }
+  .explore-more { display: inline-flex; align-items: center; gap: 9px; background: none; border: none; padding: 0;
+    cursor: pointer; font: inherit; font-size: var(--fs-meta); font-weight: 600; letter-spacing: 0.04em; color: var(--gold); }
+  .explore-more span { transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); }
+  .explore-more:hover span { transform: translateX(4px); }
+  .explore-more:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 6px; }
+
+  .explore-h { margin: 0 0 clamp(20px, 2.5vw, 32px); font-family: var(--font-display); font-weight: 400;
+    font-size: clamp(26px, 3vw, 42px); line-height: 1.05; letter-spacing: -0.02em; color: #fff; }
+
+  /* Adventures — a calm editorial list, no rating strings or badges. */
+  .adv-list { display: flex; flex-direction: column; }
+  .adv-row { display: flex; align-items: center; gap: 22px; width: 100%; text-align: left; color: inherit;
+    cursor: pointer; background: none; border: none; border-top: 1px solid rgba(255,255,255,0.09);
+    padding: clamp(20px, 2.4vw, 28px) 0; }
+  .adv-row:first-child { border-top: none; }
+  .adv-icon { flex-shrink: 0; font-size: 26px; line-height: 1; width: 34px; text-align: center; }
+  .adv-name { flex: 1; min-width: 0; font-family: var(--font-display); font-size: clamp(20px, 2.1vw, 28px);
+    line-height: 1.15; color: #fff; }
+  .adv-diff { flex-shrink: 0; font-size: var(--fs-meta); text-transform: uppercase; letter-spacing: 0.12em; color: var(--gold); }
+  .adv-arrow { flex-shrink: 0; color: var(--gold); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); }
+  .adv-row:hover .adv-arrow { transform: translateX(4px); }
+  .adv-row:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 8px; }
+`
+
+// ExploreModule — the recursive exploration entry point, rebuilt in the editorial
+// language. Iconic wonders become cinematic splits; adventures a calm list. The
+// drill contracts are UNCHANGED: every card still routes through
+// resolveNode → pushLevel, which the recursive camera system already flies on.
 function ExploreModule({ activeLocation }) {
   const pushLevel = useStore((s) => s.pushLevel)
   const loc = activeLocation
 
   const wonders = loc?.wonders ?? []
-  const gems = loc?.hiddenGems ?? []
-  // Memoized so its reference is stable for the adventureStars useMemo below.
-  const adventures = useMemo(() => loc?.adventures ?? [], [loc])
+  const adventures = loc?.adventures ?? []
 
-  // Precompute stars once per dataset instead of regenerating every render.
-  const adventureStars = useMemo(
-    () =>
-      adventures.map((a) => {
-        if (a.rating == null) return null
-        const filled = Math.max(0, Math.min(5, Math.round(a.rating)))
-        return '★'.repeat(filled) + '☆'.repeat(5 - filled)
-      }),
-    [adventures]
+  const openWonder = useCallback(
+    (w) => pushLevel(resolveNode({ ...w, type: w.type ?? 'landmark', parentId: loc?.id })),
+    [pushLevel, loc]
+  )
+  const openAdventure = useCallback(
+    (a) => pushLevel(resolveNode({ ...a, type: a.type ?? 'sublocation', parentId: loc?.id })),
+    [pushLevel, loc]
   )
 
-  if (!loc) return null
-
-  const sections = []
-
-  // ── Iconic Wonders — responsive CSS Grid (NOT columns) ──────────────────
-  if (wonders.length > 0) {
-    sections.push(
-      <ModuleWrapper key="wonders" title="Iconic Wonders" icon="🏛️">
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: 18,
-          }}
-        >
-          {wonders.map((w, i) => (
-            <LocationCard
-              key={w.name ?? i}
-              item={w}
-              title={w.name}
-              subtitle={w.description}
-              imageQuery={w.imageQuery ?? w.images?.[0]}
-              onClick={() =>
-                pushLevel(resolveNode({ ...w, type: w.type ?? 'landmark', parentId: loc.id }))
-              }
-            />
-          ))}
-        </div>
-      </ModuleWrapper>
-    )
-  }
-
-  // ── Hidden Gems — single column, feels more secretive ───────────────────
-  if (gems.length > 0) {
-    sections.push(
-      <ModuleWrapper key="gems" title="Hidden Gems" icon="💎">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {gems.map((g, i) => {
-            const diff = g.difficulty ? DIFFICULTY[String(g.difficulty).toLowerCase()] : null
-            return (
-              <LocationCard
-                key={g.name ?? i}
-                item={g}
-                title={g.name}
-                subtitle={g.description}
-                imageQuery={g.imageQuery ?? g.images?.[0]}
-                badge={diff ? <Badge color={diff.color}>{diff.label}</Badge> : null}
-                onClick={() =>
-                  pushLevel(resolveNode({ ...g, type: g.type ?? 'sublocation', parentId: loc.id }))
-                }
-              />
-            )
-          })}
-        </div>
-      </ModuleWrapper>
-    )
-  }
-
-  // ── Adventures — horizontal scroll of compact cards ─────────────────────
-  if (adventures.length > 0) {
-    sections.push(
-      <ModuleWrapper key="adventures" title="Adventures" icon="🧗">
-        <div
-          className="lw-noscroll"
-          style={{ display: 'flex', gap: 14, overflowX: 'auto', overflowY: 'hidden', paddingBottom: 4 }}
-        >
-          {adventures.map((a, i) => (
-            <button
-              key={a.name ?? i}
-              type="button"
-              onClick={() =>
-                pushLevel(resolveNode({ ...a, type: a.type ?? 'sublocation', parentId: loc.id }))
-              }
-              style={{
-                flexShrink: 0,
-                width: 240,
-                textAlign: 'left',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                padding: '18px 20px',
-                borderRadius: 12,
-                cursor: 'pointer',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'inherit',
-              }}
-            >
-              <span style={{ fontSize: 22, lineHeight: 1 }}>{activityIcon(a)}</span>
-              <span style={{ fontSize: 14, color: 'white' }}>{a.name}</span>
-              {(adventureStars[i] || a.difficulty) && (
-                <span
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    fontSize: 12,
-                    color: 'rgba(255,255,255,0.55)',
-                  }}
-                >
-                  {adventureStars[i] && (
-                    <span style={{ color: '#fbbf24', letterSpacing: '1px' }}>
-                      {adventureStars[i]}
-                    </span>
-                  )}
-                  {a.difficulty && <span>{a.difficulty}</span>}
-                </span>
-              )}
-              <span style={{ marginTop: 2, fontSize: 11, color: '#7dd3fc', letterSpacing: '0.04em' }}>
-                Explore →
-              </span>
-            </button>
-          ))}
-        </div>
-      </ModuleWrapper>
-    )
-  }
+  if (!loc || (!wonders.length && !adventures.length)) return null
 
   return (
-    <div style={{ paddingBottom: 64 }}>
-      {sections.map((section, i) => (
-        <Fragment key={section.key}>
-          {i > 0 && <Divider />}
-          {section}
-        </Fragment>
-      ))}
-    </div>
+    <Chapter
+      id="explore"
+      kicker="What not to miss"
+      title="Iconic wonders"
+      lead="The landmarks and adventures that define the place — each one a doorway to explore further."
+    >
+      <style>{STYLES}</style>
+
+      <div className="explore-flow">
+        {wonders.length > 0 && (
+          <div className="explore-wonders">
+            {wonders.map((w, i) => (
+              <EditorialSplit
+                key={w.name ?? i}
+                flip={i % 2 === 1}
+                query={w.imageQuery ?? w.images?.[0] ?? `${w.name} ${loc.name}`}
+                caption={w.name}
+              >
+                <p className="explore-kicker">Landmark</p>
+                <h3 className="explore-wonder-title">{w.name}</h3>
+                {w.description && <p className="explore-prose">{w.description}</p>}
+                <button type="button" className="explore-more" onClick={() => openWonder(w)}>
+                  Explore {w.name} <span aria-hidden="true">→</span>
+                </button>
+              </EditorialSplit>
+            ))}
+          </div>
+        )}
+
+        {adventures.length > 0 && (
+          <section className="explore-block">
+            <h3 className="explore-h">Adventures</h3>
+            <Reveal className="adv-list">
+              {adventures.map((a, i) => (
+                <button
+                  key={a.name ?? i}
+                  type="button"
+                  className="adv-row"
+                  aria-label={`Explore ${a.name}`}
+                  onClick={() => openAdventure(a)}
+                >
+                  <span className="adv-icon" aria-hidden="true">{activityIcon(a)}</span>
+                  <span className="adv-name">{a.name}</span>
+                  {a.difficulty && <span className="adv-diff">{a.difficulty}</span>}
+                  <span className="adv-arrow" aria-hidden="true">→</span>
+                </button>
+              ))}
+            </Reveal>
+          </section>
+        )}
+      </div>
+    </Chapter>
   )
 }
 

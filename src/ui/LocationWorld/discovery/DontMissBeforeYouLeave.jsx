@@ -165,7 +165,7 @@ function DontMissBeforeYouLeave({ activeLocation, levelHistory, setActiveModule 
         {state.text}
       </p>
 
-      <p style={{ margin: '12px 0 0', fontSize: 12, color: 'rgba(125,211,252,0.6)' }}>— Ellie ✦</p>
+      <p style={{ margin: '12px 0 0', fontSize: 12, color: 'rgba(232,192,122,0.6)' }}>— Ellie ✦</p>
 
       <button
         type="button"
@@ -179,7 +179,7 @@ function DontMissBeforeYouLeave({ activeLocation, levelHistory, setActiveModule 
           border: 'none',
           cursor: 'pointer',
           fontSize: 12,
-          color: '#7dd3fc',
+          color: '#e8c07a',
         }}
       >
         Ask Ellie about {name} →

@@ -1,7 +1,6 @@
 import { memo } from 'react'
 import ContinueJourney from './ContinueJourney'
 import DiscoveryFilters from './DiscoveryFilters'
-import HiddenSecrets from './HiddenSecrets'
 import SimilarVibes from './SimilarVibes'
 import DontMissBeforeYouLeave from './DontMissBeforeYouLeave'
 import BuildMyDay from './BuildMyDay'
@@ -48,7 +47,7 @@ const DISCOVERY_STYLES = `
   @media (max-width: 560px) { .sv-card { width: 250px; } }
 
   .disc-wrap button:focus-visible {
-    outline: 2px solid rgba(125,211,252,0.8); outline-offset: 2px; border-radius: 8px;
+    outline: 2px solid rgba(232,192,122,0.8); outline-offset: 2px; border-radius: 8px;
   }
 `
 
@@ -63,8 +62,8 @@ function DiscoveryEngine({ location, levelHistory, setActiveModule }) {
   return (
     <div className="disc-wrap">
       <style>{DISCOVERY_STYLES}</style>
-      {/* Place-specific discovery first… */}
-      <HiddenSecrets location={location} />
+      {/* Place-specific discovery first… (hidden gems now live in the Hidden
+          chapter, so they're no longer duplicated here.) */}
       <SimilarVibes location={location} />
       {/* Keyed by location so each new area gets a fresh shimmer→recommendation
           cycle instead of lingering on the previous location's text. */}

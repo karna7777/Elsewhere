@@ -98,7 +98,7 @@ function LocationCard({
         )}
         {children}
         {footer && (
-          <span style={{ marginTop: 6, fontSize: 13, fontWeight: 600, color: '#7dd3fc', letterSpacing: '0.04em' }}>
+          <span style={{ marginTop: 6, fontSize: 13, fontWeight: 600, color: '#e8c07a', letterSpacing: '0.04em' }}>
             {footer}
           </span>
         )}

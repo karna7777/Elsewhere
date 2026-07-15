@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PerspectiveCamera } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
@@ -10,6 +10,8 @@ import DayNight from './DayNight'
 import AtmosphereShader from './AtmosphereShader'
 import Clouds from './Clouds'
 import Aurora from './Aurora'
+import SpaceEnvironment from './SpaceEnvironment'
+import IntroSequence from './IntroSequence'
 import CameraRig from './CameraRig'
 import CountryBoundaries from './CountryBoundaries'
 import FlightArc from './FlightArc'
@@ -18,11 +20,16 @@ import { useBucketList } from '../store/useStore'
 
 const PIN_CATEGORIES = ['dream', 'upcoming', 'visited']
 
-export default function EarthScene() {
+export default function EarthScene({ introActive = false, onIntroDone }) {
   const bucketList = useBucketList()
 
   // Shared globe orientation, resolved once per frame and read by every pin.
   const earthOrientation = useMemo(() => new Quaternion(), [])
+
+  // The whole globe lives in one group so the intro can grow it into view
+  // (scale 0 → 1). It rests at scale 1 in normal operation, so the live app is
+  // unaffected; only IntroSequence ever drives it.
+  const earthGroupRef = useRef(null)
 
   // Flatten the three categories into one list of saved, mappable places.
   const pins = useMemo(() => {
@@ -44,16 +51,26 @@ export default function EarthScene() {
         gl={{ antialias: true, alpha: false }}
         dpr={[1, 2]}
       >
-        <color attach="background" args={['#000000']} />
+        {/* A near-black deep-blue base sits behind the nebula sphere (so any pixel
+            the sphere doesn't cover reads as space, never pure black). */}
+        <color attach="background" args={['#01030a']} />
         <PerspectiveCamera makeDefault position={[0, 0, 2.8]} fov={45} />
         <CameraRig />
-        <DayNight>
-          <Earth />
-          <Clouds />
-          <AtmosphereShader />
-          <Aurora />
-        </DayNight>
-        <CountryBoundaries />
+        <SpaceEnvironment />
+        <IntroSequence
+          active={introActive}
+          earthGroupRef={earthGroupRef}
+          onDone={onIntroDone}
+        />
+        <group ref={earthGroupRef}>
+          <DayNight>
+            <Earth />
+            <Clouds />
+            <AtmosphereShader />
+            <Aurora />
+          </DayNight>
+          <CountryBoundaries />
+        </group>
         <FlightArc />
         {pins.length > 0 && <EarthOrientationTracker orientation={earthOrientation} />}
         {pins.map(({ item, category }) => (

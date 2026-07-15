@@ -28,7 +28,7 @@ function ComposingShimmer({ label = 'Crafting your story' }) {
           alignItems: 'center',
           gap: 10,
           marginBottom: 22,
-          color: '#7dd3fc',
+          color: '#e8c07a',
           fontSize: 14,
           letterSpacing: '0.04em',
         }}

@@ -96,7 +96,7 @@ function EllieDisplay() {
           margin: '18px 0 0',
           fontSize: 13,
           letterSpacing: '0.1em',
-          color: 'rgba(125,211,252,0.65)',
+          color: 'rgba(232,192,122,0.65)',
         }}
       >
         Ellie ✦

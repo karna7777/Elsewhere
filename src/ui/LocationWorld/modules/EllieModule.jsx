@@ -1335,6 +1335,18 @@ function EllieModule({ activeLocation }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Contextual nudges from within the journey (EllieNudge): a chapter hands Ellie
+  // a seeded question and she answers it. Reuses the existing send path — no new
+  // AI behaviour, just another entry point that makes her feel woven-in.
+  useEffect(() => {
+    const onAsk = (event) => {
+      const prompt = event.detail?.prompt
+      if (prompt) sendToEllie(prompt)
+    }
+    window.addEventListener('elsewhere:ask-ellie', onAsk)
+    return () => window.removeEventListener('elsewhere:ask-ellie', onAsk)
+  }, [sendToEllie])
+
   const handleSubmit = useCallback(
     (e) => {
       e.preventDefault()
@@ -1357,9 +1369,20 @@ function EllieModule({ activeLocation }) {
         flexDirection: 'column',
       }}
     >
-      <style>{`.ellie-input::placeholder { color: rgba(255,255,255,0.4); } .ellie-input { caret-color: #7dd3fc; }`}</style>
+      <style>{`.ellie-input::placeholder { color: rgba(255,255,255,0.4); } .ellie-input { caret-color: #e8c07a; }`}</style>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 36, paddingBottom: 32 }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 36,
+          paddingBottom: 32,
+          // Before the conversation starts, centre the greeting + suggestions so
+          // the opening screen feels composed rather than top-loaded with a void.
+          justifyContent: started ? 'flex-start' : 'center',
+        }}
+      >
         {started ? (
           <EllieDisplay />
         ) : (
@@ -1436,8 +1459,8 @@ function EllieModule({ activeLocation }) {
             height: 48,
             borderRadius: '50%',
             border: 'none',
-            background: 'rgba(125,211,252,0.15)',
-            color: '#7dd3fc',
+            background: 'rgba(232,192,122,0.15)',
+            color: '#e8c07a',
             fontSize: 22,
             lineHeight: 1,
             opacity: canSend ? 1 : 0.35,

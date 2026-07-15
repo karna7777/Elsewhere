@@ -130,7 +130,7 @@ const BMD_STYLES = `
   .bmd-row { display: flex; gap: 14px; }
   @media (max-width: 560px) { .bmd-row { flex-direction: column; gap: 6px; } }
 
-  .bmd-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #7dd3fc; font-weight: 600; }
+  .bmd-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #e8c07a; font-weight: 600; }
   .bmd-content { font-size: 13px; color: rgba(255,255,255,0.75); line-height: 1.6; }
   .bmd-refine:hover { text-decoration: underline; }
 `
@@ -192,15 +192,15 @@ function BuildMyDay({ activeLocation, setActiveModule }) {
           type="button"
           aria-label={`Build my day in ${name}`}
           onClick={generatePlan}
-          whileHover={{ scale: 1.02, borderColor: 'rgba(125,211,252,0.5)' }}
+          whileHover={{ scale: 1.02, borderColor: 'rgba(232,192,122,0.5)' }}
           transition={{ duration: 0.2, ease: EASE }}
           style={{
             cursor: 'pointer',
             padding: '16px 24px',
             borderRadius: 14,
-            border: '1px solid rgba(125,211,252,0.25)',
-            background: 'rgba(125,211,252,0.10)',
-            color: '#7dd3fc',
+            border: '1px solid rgba(232,192,122,0.25)',
+            background: 'rgba(232,192,122,0.10)',
+            color: '#e8c07a',
             fontSize: 16,
             fontWeight: 500,
           }}
@@ -256,7 +256,7 @@ function BuildMyDay({ activeLocation, setActiveModule }) {
           border: 'none',
           cursor: 'pointer',
           fontSize: 12,
-          color: '#7dd3fc',
+          color: '#e8c07a',
         }}
       >
         Want Ellie to refine this plan →

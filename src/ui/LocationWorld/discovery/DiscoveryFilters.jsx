@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../../store/useStore'
 import LocationCard from '../modules/shared/LocationCard'
@@ -86,6 +86,25 @@ function DiscoveryFilters({ location }) {
   const selectFilter = useCallback((id) => setDiscoveryFilter(id), [setDiscoveryFilter])
   const handleSelect = useCallback((node) => pushLevel(node), [pushLevel])
 
+  // Does any lens have somewhere to show for this place?
+  const anyResults = useMemo(
+    () => chips.some((id) => (FILTER_FUNCTIONS[id]?.(location)?.length ?? 0) > 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [location.id, chips]
+  )
+
+  // On arriving at a new place, if the remembered lens has nothing here, switch to
+  // the first lens that does — so the section never opens on a dead "Nothing here
+  // yet" (an explicit chip tap can still land on an empty lens; that's intentional).
+  useEffect(() => {
+    if ((FILTER_FUNCTIONS[discoveryFilter]?.(location)?.length ?? 0) > 0) return
+    const firstWithResults = chips.find(
+      (id) => (FILTER_FUNCTIONS[id]?.(location)?.length ?? 0) > 0
+    )
+    if (firstWithResults && firstWithResults !== discoveryFilter) setDiscoveryFilter(firstWithResults)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.id])
+
   // Roving arrow-key focus across chips.
   const onChipKeyDown = useCallback(
     (e, idx) => {
@@ -100,6 +119,9 @@ function DiscoveryFilters({ location }) {
 
   const showBadge = BADGE_FILTERS.has(discoveryFilter)
   const subheading = FILTER_SUBHEADINGS[discoveryFilter] ?? ''
+
+  // Nothing to discover from here — collapse rather than show a dead end.
+  if (!anyResults) return null
 
   return (
     <section className="disc-section">
@@ -126,7 +148,7 @@ function DiscoveryFilters({ location }) {
                 padding: '8px 16px',
                 borderRadius: 30,
                 border: '1px solid transparent',
-                background: active ? '#7dd3fc' : 'rgba(255,255,255,0.07)',
+                background: active ? '#e8c07a' : 'rgba(255,255,255,0.07)',
                 color: active ? 'rgba(4,8,18,0.9)' : 'rgba(255,255,255,0.7)',
                 fontWeight: active ? 600 : 400,
                 transition: 'background 0.2s ease, color 0.2s ease',
@@ -179,7 +201,7 @@ function DiscoveryFilters({ location }) {
               padding: '9px 18px',
               borderRadius: 30,
               border: '1px solid transparent',
-              background: '#7dd3fc',
+              background: '#e8c07a',
               color: 'rgba(4,8,18,0.9)',
               fontWeight: 600,
             }}

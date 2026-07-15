@@ -123,7 +123,7 @@ function HiddenSecrets({ location }) {
                   cursor: 'pointer',
                   padding: 0,
                   fontSize: 11,
-                  color: '#7dd3fc',
+                  color: '#e8c07a',
                   letterSpacing: '0.04em',
                 }}
               >
